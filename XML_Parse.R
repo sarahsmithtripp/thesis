@@ -68,6 +68,7 @@ tree_plots <- data[tree_points, ]
 #export data 
 write.csv(tree_plots, file = "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Tree_Data/treeplot_locations_redo.csv")
 write.csv(data, file = "GIS_Points.csv")
+
 ## Seperate GC points 
 data <- as.data.frame(data)
 gc_pts <- which(grepl("gc", data$name))
@@ -110,10 +111,19 @@ gc_pts_accuracy <- points[c(gc_pts_accuracy),]
 
 
 # ## Set option for # of digits very high so that it does not round csv output 
-# options(digits = 25)
+# options(digits = 22)
 # write.csv(gc_pts_accuracy, file = "gc_pts_accuracy.csv")
+# grab missing points 
+#p60.5, bt7, 3.52 #1 (named as upper plots gc 4 @2.95(verified with GIS))
+p60.5 <- which(grepl("60.5", data[,1]))
+bt7 <- which(grepl("btw7", data[,1])) 
+# check <- select 12 
+bt7 <- 12
+p3.52.1 <- which(grepl("upperplotsgc4@295", data[,1]))
+missing_points <- data[c(p60.5, bt7, p3.52.1),]
+#export data 
+#write.csv(missing_points, file = "missingmicroclimate_pts.csv")
 
-# 
 # #set the option back to something more reasonable 
 # options(digits = 15)
 # 
