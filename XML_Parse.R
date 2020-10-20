@@ -8,8 +8,10 @@
 
 library(xml2)
 setwd("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/GPX_Waypoints")
-alex_frazer <- read_xml("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/alexfraser_UTM_Leica.xml")
+#alex_frazer <- read_xml("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/alexfraser_UTM_Leica.xml")
+alex_frazer <- read_xml("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/tree_data/alexfraser.xml")
 data <- as_list(alex_frazer)
+data$LandXML$CgPoints
 
 GPS_pts <- data$LandXML$Survey$GPSSetup
 GPS_pts <- data$LandXML$HexagonLandXML
@@ -52,6 +54,19 @@ for(i in 1:length(Cg_pts_list)) {
   }
 }
 
+#subset to select just tree points 
+tree_points <- which(grepl("tree", data[,1]))
+tree_point_1 <- which(grepl("trree", data[,1]))
+tree_points <- c(tree_points, tree_point_1)
+#remember the plot 12, 10, 11 and are based on locations of loggers 
+#plot 11 is 60.5 and 12 is cont6, 10 is 15 meters south of cont 9 
+p60.5 <- which(grepl("60.5", data[,1]))
+pcont6 <- which(grepl("cont6", data[,1]))
+
+tree_points <- c(tree_points, p60.5, pcont6)
+tree_plots <- data[tree_points, ]
+#export data 
+write.csv(tree_plots, file = "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Tree_Data/treeplot_locations_redo.csv")
 write.csv(data, file = "GIS_Points.csv")
 ## Seperate GC points 
 data <- as.data.frame(data)
