@@ -142,7 +142,7 @@ CHM_max_height <- raster::extract(chm_raster,
                        fun=max,
                        sp=TRUE,
                        stringsAsFactors=FALSE)
-CHM_mean_height <- raster::extract(chm_raster,
+CHM_mean_height <- raster::extract(chm_raster_2m,
                                   tree_locations,
                                   buffer = 6.5,
                                   fun=mean,
@@ -183,7 +183,7 @@ max_plot <- ggplot(CHM_withField, aes(x=chm_10cm, y = fieldhtmax_trees)) +
   xlab("Maximum DAP Pixel (m)")+
   geom_abline(intercept = 0, slope=1) +
   ggtitle("Max DAP vs. Field Ht (m)")
-mean_plot <- ggplot(CHM_field_mean, aes(x=chm_10cm, y = fieldhtmean_trees)) +
+mean_plot <- ggplot(CHM_field_mean_all, aes(x=chm_10cm, y = fieldhtmean_trees)) +
   geom_point() +
   theme_bw() +
   ylab("Mean measured height (m)") +
@@ -194,5 +194,5 @@ mean_plot <- ggplot(CHM_field_mean, aes(x=chm_10cm, y = fieldhtmean_trees)) +
 cowplot::plot_grid(max_plot, mean_plot, rel_widths = c(1.2, 1.3))
 
 lm_tree_height_max <- lm(chm_10cm ~ fieldhtmax_trees, CHM_withField)
-lm_tree_height_mean <- lm(chm_10cm ~ fieldhtmean_trees, CHM_field_mean)
+lm_tree_height_mean <- lm(chm_10cm ~ fieldhtmean_trees, CHM_field_mean_all)
 mean_plot
