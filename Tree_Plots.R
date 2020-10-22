@@ -98,6 +98,7 @@ plot_12_data  <- data.frame(t(c(1, "tree_12", NA, NA, 2020-10-10,585164.42091964
 names(plot_12_data) <- names(tree_locations_partial@data)
 #combine plot 12 with other plots 
 data_merge <- rbind(tree_locations_partial@data, plot_12_data)
+
 #create spatial polygons data frame to work with the data 
 tree_locations <- sp::SpatialPointsDataFrame(cbind(as.numeric(data_merge[,'x']),as.numeric(data_merge[,'y'])) ,data = data_merge)
 sp::proj4string(tree_locations)<- sp::CRS("+proj=utm +zone=10 +datum=NAD83 +units=m +no_defs")
@@ -130,7 +131,7 @@ chm_2m_raster <- raster::raster(paste0(query[[4]],
                                       "/chm_2m_10cmres.tif"))
 
 #raster with all values (heights = 0 to max) used to produce chm
-chm_tif <- all_files[61]
+chm_tif <- all_files[which(grepl("/Old_guy/chm_10cm.tif", all_files))][1]
 chm_raster <- raster::raster(chm_tif)
 
 #Alternative to aggregate to 2 meter resolution
@@ -173,8 +174,6 @@ DAP_comp_Field <- function(raster, field_data,variable_of_interest,
   out <- merge(raster_values, summary_data, by = "Plot")
   return(out) 
   }
-
-test <- DAP_comp_Field(chm_2m_raster, trees_locations, mean, summary_trees, clean_names = T)
 
 
 chm_raster[chm_raster == 0] <- NA
