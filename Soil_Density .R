@@ -278,7 +278,10 @@ View(all_plots %>%
        group_by(plot_num) %>% 
        summarise(max = max(`bulk density`, na.rm = T),
               min = min(`bulk density`, na.rm = T), 
+              mean = mean(`bulk density`, na.rm = T),
               range= max - min))
 
+mean(all_plots$`bulk density`, na.rm = T)
+anova(lm(all_plots$`bulk density` ~ all_plots$plot_num))
 
 View(all_plots)
