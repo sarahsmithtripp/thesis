@@ -250,10 +250,10 @@ ggplot(veg_all_sum, aes(area, Veg_depth_cm, group = logger, color = area))+
   geom_point(alpha = 0.8, position = 'jitter')
 
 legend <- get_legend(bulk_density_graph)
-save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/bulk_density.jpg', 
+save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/veg_litter.jpg', 
           plot_grid(lit_graph, veg_graph, legend, nrow = 1, rel_widths = c(1,1,0.2)),
           base_width =7.5, base_height = 4)
-save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/veg_litter.jpg', 
+save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/bulk_density.jpg', 
           bulk_density_graph,
           base_width =4.5, base_height = 3)
 

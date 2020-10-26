@@ -261,7 +261,8 @@ max_plot <- ggplot(as.data.frame(CHM_max_field), aes(x=chm_2m_10cmres, y = field
   geom_abline(intercept = 0, slope=1) +
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
-  cowplot::theme_cowplot()
+  guides(color = F) + 
+  cowplot::theme_cowplot() + 
   ggtitle("Max DAP vs. Field Ht (m)")
 mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres, y = fieldhtmean_trees)) +
   geom_point(aes(color = plot_num), size = 3) +
@@ -272,11 +273,16 @@ mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres, y = fie
   geom_abline(intercept = 0, slope=1) + 
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
+  labs(color = "Plot") + 
   cowplot::theme_cowplot() +
   ggtitle("Mean DAP vs. Field Ht")
 
-cowplot::plot_grid(max_plot, mean_plot, rel_widths = c(1.2, 1.3))
 
-lm_tree_height_max <- lm(chm_10cm ~ fieldhtmax_trees, CHM_withField)
-lm_tree_height_mean <- lm(chm_2m_10cmres ~ fieldhtmean_trees, CHM_field_mean_all)
+# save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/HeightVerification_Plots.jpg',
+#           cowplot::plot_grid(max_plot, mean_plot, rel_widths = c(1.2, 1.3)),
+#           base_width =7.5, base_height = 4)
+
+
+lm_tree_height_max <- lm(chm_2m_10cmres ~ fieldhtmax_trees, CHM_mean_field)
+lm_tree_height_mean <- lm(chm_2m_10cmres ~ fieldhtmean_trees, CHM_max_field)
 mean_plot
