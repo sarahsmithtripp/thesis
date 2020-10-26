@@ -245,9 +245,7 @@ veg_graph <- ggplot()+
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
   guides(color = F, fill = F) +
   cowplot::theme_cowplot()
-ggplot(veg_all_sum, aes(area, Veg_depth_cm, group = logger, color = area))+ 
-  geom_boxplot() + 
-  geom_point(alpha = 0.8, position = 'jitter')
+
 
 legend <- get_legend(bulk_density_graph)
 save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/veg_litter.jpg', 
@@ -276,6 +274,11 @@ length(veg_all_plots$Veg_depth_cm)
 veg_graph
 
 
+View(all_plots %>% 
+       group_by(plot_num) %>% 
+       summarise(max = max(`bulk density`, na.rm = T),
+              min = min(`bulk density`, na.rm = T), 
+              range= max - min))
 
 
-
+View(all_plots)
