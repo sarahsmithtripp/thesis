@@ -89,14 +89,23 @@ LAI$plot_point <- paste(LAI$plot_match, LAI$Point, sep = "-")
 CanopyCov_LAI <- merge(canopy_cov_metrics, LAI, by = "plot_point")
 
 Canopy_LAI_plot <- ggplot(as.data.frame(CanopyCov_LAI), aes(x=LAI, y = avgper_cov)) +
-  geom_point() +
+  geom_point(aes(col = plot)) +
   theme_bw() +
   xlab("Field Measured LAI") +
-  ylab("Avg % of pts above 2m") + 
-  stat_smooth(method = "lm")
+  ylab("Avg % of pts above 2m") 
+  #stat_smooth(method = "lm")
 
-
+Mean_Height_Graph <- ggplot(as.data.frame(CanopyCov_LAI), aes(plot_num, mean_ht, group = plot_num, color = plot_num)) + 
+  geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(alpha = 0.8, position = 'jitter')+
+  ylab("Mean Canopy Height (m)") + 
+  xlab("plot") + 
+  labs(color = "Plot") +
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  cowplot:: theme_cowplot()
 Canopy_LAI_plot
 
 lm_canopy_LAI <- lm(avgper_cov ~ LAI, CanopyCov_LAI)
 summary(lm_canopy_LAI)
+
+

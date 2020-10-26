@@ -26,28 +26,62 @@ polar2cart <- function(data) {
 
 ## read in the data
 trees <- readxl::read_excel("Tree_Data.xlsx", sheet = "Cleaned")
+trees$Micro_plot_fact <- trees$`Microclimate Plot`
+trees <- trees %>% 
+  mutate(plot_match = dplyr::case_when(.$'Micro_plot_fact'== '60' ~ "60",
+                                .$'Micro_plot_fact' == '4.66' ~ '4.66',
+                                .$'Micro_plot_fact' == '3.52' ~ '3.52',
+                                .$'Micro_plot_fact' == "1.83" ~ '1.83', 
+                                .$'Micro_plot_fact' == '1.55' ~ '1.55',
+                                .$'Micro_plot_fact' == '3.66' ~ '3.66',
+                                .$'Micro_plot_fact' == 'Oldguy'|.$'Micro_plot_fact' == 'OldGuy' ~ 'oldguy',  
+                                .$'Micro_plot_fact' == 'cc'| .$'Micro_plot_fact' == 'CC' ~ 'cc' ,
+                                .$'Micro_plot_fact' == 'cont'|.$'Micro_plot_fact' == 'Cont' |.$'Micro_plot_fact' == "CONT" ~'cont',
+                                .$'Micro_plot_fact' == 'BT' ~ 'bt'))
+
+##Add in plot level data to determine if this could vary by fire severity
+#Read in plots with fire severity to order the loggers 
+#write sequence to name for numbers 
+seq <- seq(from =1 , to = 10, by = 1)
+fs_seq <- paste0("fs", seq)
+plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
+plots@data <- plots@data %>% 
+  arrange(X_firemean) %>%
+  mutate(
+    plot_match = as.factor(case_when( plot == '60' ~ "60",
+                                      plot == '4.66' ~ '4.66',
+                                      plot == '3.52' ~ '3.52',
+                                      plot == '1.83' ~ '1.83', 
+                                      plot == '1.55' ~ '1.55',
+                                      plot == '3.66' ~ '3.66',
+                                      plot == 'oldguy' ~ 'oldguy', 
+                                      plot == 'cc' ~ 'cc' ,
+                                      plot == 'cont' ~ 'cont',
+                                      plot == 'bt' ~ 'bt')))
+
+plots@data$plot_num <- factor(fs_seq, levels = fs_seq)
+#Drop all things note needed from plots before joining 
+plots_df <- plots@data[, c("plot_match", "X_firemean","X_firestdev",
+                           "plot_num")]
+trees <- left_join(trees, plots_df, by = "plot_match")
+View(trees)
 trees_cart <- polar2cart(trees)
 trees_cart$Plot <- as.factor(trees_cart$Plot)
+
 ##explore the data 
 length(unique(trees$Plot))
 
 summary_trees <- trees %>% 
+  filter(Distance < 6.5) %>% # clip to the final area size 
   group_by(Plot) %>% 
-  summarise(
+  summarise( 
     fieldhtmax_trees = max(Adgjusted_height, na.rm = T), 
     fieldhtmean_trees = mean(Adgjusted_height, na.rm = T),
             mean_dbh = mean(as.numeric(DHB), na.rm = T),
             fieldhtsd_trees = sd(Adgjusted_height, na.rm = T),
-            count = length(`TREE ID`))
-summary_trees <- trees %>% 
-  group_by(Plot) %>% 
-  summarise(
-    fieldhtmax_trees = max(Height, na.rm = T), 
-    fieldhtmean_trees = mean(Height, na.rm = T),
-    mean_dbh = mean(as.numeric(DHB), na.rm = T),
-    fieldhtsd_trees = sd(Height, na.rm = T),
-    count = length(`TREE ID`))
+           count = length(`TREE ID`)) 
 
+summary_trees <- left_join(summary_trees, unique(trees_cart[,c("Plot", "plot_num")]), by = "Plot")
 summary_livetrees <- trees %>% 
   filter(State %in% c("A", "a")) %>% 
   group_by(Plot) %>% 
@@ -85,7 +119,7 @@ map <- ggplot(trees_cart, aes(x, y)) +
 map
 
 #save tree plot maps to file 
-save_plot("tree_maps.jpeg", map, base_height = 8, base_width = 8)
+#save_plot("tree_maps.jpeg", map, base_height = 8, base_width = 8)
 
 
 
@@ -138,23 +172,15 @@ chm_raster <- raster::raster(chm_tif)
 #chm_raster_2m <- raster::aggregate(chm_raster, 20, fun = mean, na.rm = T)
 
 ## plot locations on CHMs
-plot.new()
-par(mar=c(0.2,0.2,0.2,0.2))
-png(filename = "chm_w_pts.png", res = 300,
-    width = 4, height = 5.5, units = "in")
-raster::plot(chm_raster)
-raster::plot(tree_location_buffer, add =T)
-dev.off()
+# plot.new()
+# par(mar=c(0.2,0.2,0.2,0.2))
+# png(filename = "chm_w_pts.png", res = 300,
+#     width = 4, height = 5.5, units = "in")
+# raster::plot(chm_raster)
+# raster::plot(tree_location_buffer, add =T)
+# dev.off()
 
-#function to clean up naming of plots for easier field vs. DAP deduction
-clean_naming <- function(data){
-  data@data <- tidyr::separate(data@data, name, c("Plot", "MicroclimatePt"), "-")
-  data@data$Plot <- gsub("tree", "", data$Plot)
-  
-  #fix the four plots with pooly named values 
-  data@data[12:15,2] <- rbind(c(22), c(11), c(10), c(12))
-  return(data)
-}
+
 
 #merge data to field data and calculate values of interest
 DAP_comp_Field <- function(raster, field_data,variable_of_interest,
@@ -178,7 +204,7 @@ DAP_comp_Field <- function(raster, field_data,variable_of_interest,
 
 chm_raster[chm_raster == 0] <- NA
 chm_2m_raster[chm_2m_raster == 0] <- NA
-chm_raster_2m[chm_raster_2m == 0]
+#chm_raster_2m[chm_raster_2m == 0]
 
 # Insitu sampling took place within 6.5 radius plots
 # Note that below will return a dataframe containing the max height
@@ -195,43 +221,58 @@ CHM_mean_height <- raster::extract(chm_2m_raster,
                                   fun=mean,
                                   sp=TRUE,
                                   stringsAsFactors=FALSE)
-CHM_max_height_2m <- raster::extract(chm_raster_2m,
-                                  tree_locations,
-                                  buffer = 6.5,
-                                  fun=max,
-                                  sp=TRUE,
-                                  stringsAsFactors=FALSE)
+# CHM_max_height_2m <- raster::extract(chm_raster_2m,
+#                                   tree_locations,
+#                                   buffer = 6.5,
+#                                   fun=max,
+#                                   sp=TRUE,
+#                                   stringsAsFactors=FALSE)
+
+
+#function to clean up naming of plots for easier field vs. DAP deduction
+clean_naming <- function(data){
+  data@data <- tidyr::separate(data@data, name, c("Plot", "MicroclimatePt"), "-")
+  data@data$Plot <- gsub("tree", "", data$Plot)
+  
+  #fix the four plots with pooly named values 
+  data@data[12:15,2] <- rbind(c(22), c(11), c(10), c(12))
+  return(data)
+}
 
 
 CHM_max_height <- clean_naming(CHM_max_height)
-CHM_max_height_2m <- clean_naming(CHM_max_height_2m)
+#CHM_max_height_2m <- clean_naming(CHM_max_height_2m)
 CHM_mean_height <- clean_naming(CHM_mean_height)
 
-CHM_withField <- merge(CHM_max_height, summary_trees, by = "Plot")
-CHM_field_mean_all <- merge(CHM_mean_height, summary_trees, by = "Plot")
+CHM_max_field <- merge(CHM_max_height, summary_trees, by = "Plot")
+CHM_mean_field <- merge(CHM_mean_height, summary_trees, by = "Plot")
 
 #check to see if DAP better at detecting live trees 
 CHM_field_mean_livetrees <- merge(CHM_mean_height, summary_livetrees, by = "Plot")
-CHM_field_2m <- merge(CHM_max_height_2m, summary_trees, by = "Plot")
+#CHM_field_2m <- merge(CHM_max_height_2m, summary_trees, by = "Plot")
 ## plot the derived data
 library(ggplot2)
-max_plot <- ggplot(as.data.frame(CHM_withField), aes(x=chm_2m_10cmres, y = fieldhtmax_trees)) +
-  geom_point() +
-  theme_bw() +
+max_plot <- ggplot(as.data.frame(CHM_max_field), aes(x=chm_2m_10cmres, y = fieldhtmax_trees)) +
+  geom_point(aes(color = plot_num), size = 3) + 
   ylab("Maximum measured height (m)") +
   xlab("Maximum DAP Pixel (m)")+
   xlim(0,35) + 
   ylim(0,35) + 
   geom_abline(intercept = 0, slope=1) +
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
+  cowplot::theme_cowplot()
   ggtitle("Max DAP vs. Field Ht (m)")
-mean_plot <- ggplot(as.data.frame(CHM_field_mean_all), aes(x=chm_2m_10cmres, y = fieldhtmean_trees)) +
-  geom_point() +
-  theme_bw() +
+mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres, y = fieldhtmean_trees)) +
+  geom_point(aes(color = plot_num), size = 3) +
   ylab("Mean measured height (m)") +
   xlab("Mean DAP Pixel (m)")+
   xlim(0,35) + 
   ylim(0,35) +
   geom_abline(intercept = 0, slope=1) + 
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
+  cowplot::theme_cowplot() +
   ggtitle("Mean DAP vs. Field Ht")
 
 cowplot::plot_grid(max_plot, mean_plot, rel_widths = c(1.2, 1.3))
