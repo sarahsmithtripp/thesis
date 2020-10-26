@@ -1,8 +1,16 @@
 ## Script written to make figure for soil density 
-setwd("~/Documents/UBC/Thesis/Methods")
 
-soil_data <- readxl::read_excel("Sample_Sites_Soil.xlsx", sheet = "Sheet1")
 library(dplyr)
+library(tidyverse)
+
+#Sarah's Laptop 
+#setwd("~/Documents/UBC/Thesis/Methods")
+#School Computer
+setwd("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)")
+
+#read in soil_data
+soil_data <- readxl::read_excel("Sample_Sites_Soil.xlsx", sheet = "Sheet1")
+
 soil_data_plots <- soil_data %>% 
   tidyr::separate(col = ID...1, into = c("plot", "point"), sep = '-w', extra = "merge")
 good_boy_plots<- filter(soil_data_plots, !is.na(point))
@@ -39,12 +47,22 @@ all_plots <- all_plots %>%
   mutate(area = as.factor(case_when( plot == '-60.' | plot == '-CONT' ~ "lowerplots",
                                      plot == "1.55-"| plot == "CC" | plot == "3.52-" | plot == "4.66-" ~ "upperplots",
                                      plot == "1.83-" | plot == "3.66-" | plot == "BT-W" ~ "midplots",
-                                     plot == "OLDGUY" ~ "oldguy")))
+                                     plot == "OLDGUY" ~ "oldguy")),
+         plot_match = as.factor(case_when( plot == '-60.' ~ "60",
+                                           plot == '4.66-' ~ '4.66',
+                                           plot == '3.52-' ~ '3.52',
+                                           plot == '1.83-' ~ '1.83', 
+                                           plot == '1.55-' ~ '1.55',
+                                           plot == '3.66-' ~ '3.66',
+                                           plot == 'OLDGUY' ~ 'oldguy', 
+                                           plot == 'CC' ~ 'cc' ,
+                                           plot == '-CONT' ~ 'cont',
+                                           plot == 'BT-W' ~ 'bt')))
 
 #bind poorly named plots to the main dataframe
 
   
-vegetation_data <- readxl::read_excel("~/Documents/UBC/Thesis/Data Folder /Vegetation_Data_Clean.xlsx")
+vegetation_data <- readxl::read_excel("Vegetation_Data_Clean.xlsx")
 litter <- which(grepl("Lit", names(vegetation_data)))
 veg <- which(grepl("Veg", names(vegetation_data)))
 vegetation_data[,c(veg, litter)] <- lapply(vegetation_data[,c(veg, litter)], as.numeric)
@@ -56,31 +74,67 @@ veg <- vegetation_data[,c(1, veg)] %>%
   pivot_longer(cols = starts_with("Veg"), values_to = c("Veg_depth_cm"), names_to = "Veg_Measurement") %>% 
   tidyr::separate(col = "Veg_Measurement", into = c("drop_1", "Measurement","drop_2"), sep = "_", extra = "merge")
 veg <- veg[,-c(which(grepl("drop", names(veg))))]
-veg_lit <- left_join(litter, veg, by = c("Logger", "Measurement")) 
+veg_lit <- litter %>% 
+  left_join(veg, by = c("Logger", "Measurement")) 
+  
 
   
 
 names(veg_lit)[1]<- "logger"
 veg_all_plots<- all_plots %>% left_join(veg_lit, by = "logger")
+
+
+
+#Read in plots with fire severity to order the loggers 
+#write sequence to name for numbers 
+seq <- seq(from =1 , to = 10, by = 1)
+fs_seq <- paste0("fs", seq)
+plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
+plots@data <- plots@data %>% 
+  arrange(X_firemean) %>%
+  mutate(
+         plot_match = as.factor(case_when( plot == '60' ~ "60",
+                                           plot == '4.66' ~ '4.66',
+                                           plot == '3.52' ~ '3.52',
+                                           plot == '1.83' ~ '1.83', 
+                                           plot == '1.55' ~ '1.55',
+                                           plot == '3.66' ~ '3.66',
+                                           plot == 'oldguy' ~ 'oldguy', 
+                                           plot == 'cc' ~ 'cc' ,
+                                           plot == 'cont' ~ 'cont',
+                                           plot == 'bt' ~ 'bt')))
+
+plots@data$plot_num <- factor(fs_seq, levels = fs_seq)
+#Drop all things note needed from plots before joining 
+plots_df <- plots@data[, c("plot_match", "X_firemean","X_firestdev",
+                           "plot_num")]
+all_plots <- left_join(all_plots, plots_df, by = "plot_match")
+veg_all_plots <- left_join(veg_all_plots, plots_df, by = "plot_match")
+#write.csv(veg_all_plots, "Veg-Soil-PlotFireSev.csv")
+
 veg_all_sum <- veg_all_plots %>% group_by(logger) %>% 
   summarize(mean_veg = mean(Veg_depth_cm),
             stdev_veg = sd(Veg_depth_cm),
             mean_lit = mean(Lit_depth_cm), 
             stdev_lit = sd(Lit_depth_cm)) %>% 
-  inner_join(all_plots[, c("plot", "logger", "area")], by = "logger")%>%
+  inner_join(all_plots[, c("plot_num", "logger", "area")], by = "logger")%>%
   mutate(logger_fac = as.factor(logger))
 
 library(ggplot2)
 
 #bulk density 
-bulk_density_graph <- ggplot(all_plots, aes(area, `bulk density`, group = area, color = area)) + 
-  geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
-  geom_point(alpha = 0.8, position = 'jitter')+
+bulk_density_graph <- ggplot(all_plots, aes(plot_num, `bulk density`, group = plot_num, color = plot_num)) + 
+  geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8), aes(fill = plot_num)) + 
+  geom_point(alpha = 0.7, sive = 1.2, position = 'jitter')+
   ylab("Bulk Density (g/cm^3)") + 
-  labs(color = "Area") +
+  labs(color = "Plot") +
+  xlab("Plot")+
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   cowplot:: theme_cowplot()
 
+bulk_density_graph
 #vegetation_data 
 
 library(dplyr)
@@ -168,29 +222,60 @@ GeomFlatViolin <-
 
 
 library(cowplot)
-veg_all_sum$plot <- as.factor(veg_all_sum$plot)
+veg_all_sum$plot <- as.factor(veg_all_sum$plot_num)
 veg_all_sum$plot_area <- do.call(paste0, veg_all_sum[, c("plot", "area")])
 veg_all_plots$plot_area <- do.call(paste0, veg_all_plots[, c("plot", "area")])
 lit_graph <- ggplot()+ 
-  geom_flat_violin(data = veg_all_plots, aes(area, Lit_depth_cm, color = area, fill = area), alpha = 0.4) + 
-  geom_point(data = veg_all_sum, aes(area,mean_lit, group = logger, color = area), alpha = 0.8, position = 'jitter') +
+  geom_violin(data = veg_all_plots, aes(plot_num, Lit_depth_cm, color = plot_num, fill = plot_num), alpha = 0.4) + 
+  geom_point(data = veg_all_sum, aes(plot_num,mean_lit, group = logger, color = plot_num), alpha = 0.8, position = 'jitter') +
   ylab("Litter Depth (cm)") + 
   labs(color = "Area") + 
+  xlab("Plot")+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
   guides(color = F, fill= F) + 
   cowplot::theme_cowplot()
 veg_graph <- ggplot()+ 
-  geom_flat_violin(data = veg_all_plots, aes(area, Veg_depth_cm, color = area, fill = area), alpha = 0.4 ) + 
-  geom_point(data = veg_all_sum, aes(area,mean_veg, group = logger, color = area), alpha = 0.8, position = 'jitter') +
+  geom_violin(data = veg_all_plots, aes(plot_num, Veg_depth_cm, color = plot_num, fill = plot_num), alpha = 0.4 ) + 
+  geom_point(data = veg_all_sum, aes(plot_num,mean_veg, group = logger, color = plot_num), alpha = 0.8, position = 'jitter') +
   ylab("Vegetation Height (cm)") + 
   labs(color = "Area") + 
+  xlab("Plot")  +
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
   guides(color = F, fill = F) +
   cowplot::theme_cowplot()
 ggplot(veg_all_sum, aes(area, Veg_depth_cm, group = logger, color = area))+ 
   geom_boxplot() + 
   geom_point(alpha = 0.8, position = 'jitter')
 
-plot_grid(lit_graph, veg_graph, bulk_density_graph, nrow = 1, rel_widths = c(1,1,1.5
-                                                                             ))
+legend <- get_legend(bulk_density_graph)
+save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/bulk_density.jpg', 
+          plot_grid(lit_graph, veg_graph, legend, nrow = 1, rel_widths = c(1,1,0.2)),
+          base_width =7.5, base_height = 4)
+save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/veg_litter.jpg', 
+          bulk_density_graph,
+          base_width =4.5, base_height = 3)
 
 test <- subset(veg_all_sum, plot_area == "OLDGUYoldguy")
   
+
+ggplot()+ 
+  geom_flat_violin(data = veg_all_plots, aes(Veg_depth_cm, plot_num, color = plot_num, fill = plot_num), alpha = 0.4 ) + 
+  geom_point(data = veg_all_sum, aes(mean_veg,plot_num, group = logger, color = plot_num), alpha = 0.8, position = 'jitter') +
+  ylab("Vegetation Height (cm)") + 
+  labs(color = "Area") + 
+  xlab("Plot")  +
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
+  guides(color = F, fill = F) +
+  cowplot::theme_cowplot()
+
+length(veg_all_plots$Veg_depth_cm)
+
+veg_graph
+
+
+
+
+

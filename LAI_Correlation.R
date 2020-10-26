@@ -92,7 +92,8 @@ Canopy_LAI_plot <- ggplot(as.data.frame(CanopyCov_LAI), aes(x=LAI, y = avgper_co
   geom_point() +
   theme_bw() +
   xlab("Field Measured LAI") +
-  ylab("Avg % of pts above 2m")
+  ylab("Avg % of pts above 2m") + 
+  stat_smooth(method = "lm")
 
 
 Canopy_LAI_plot
