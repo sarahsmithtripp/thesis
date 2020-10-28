@@ -75,10 +75,12 @@ veg <- vegetation_data[,c(1, veg)] %>%
   tidyr::separate(col = "Veg_Measurement", into = c("drop_1", "Measurement","drop_2"), sep = "_", extra = "merge")
 veg <- veg[,-c(which(grepl("drop", names(veg))))]
 veg_lit <- litter %>% 
-  left_join(veg, by = c("Logger", "Measurement")) 
+  left_join(veg, by = c("Logger", "Measurement")) %>%
+  left_join(vegetation_data[,c("Logger", "Comments Oct", "Comments june-july", "Original Logger")])
   
 
-  
+
+### Incorporating Replaced Loggers 
 
 names(veg_lit)[1]<- "logger"
 veg_all_plots<- all_plots %>% left_join(veg_lit, by = "logger")
@@ -110,7 +112,7 @@ plots_df <- plots@data[, c("plot_match", "X_firemean","X_firestdev",
                            "plot_num")]
 all_plots <- left_join(all_plots, plots_df, by = "plot_match")
 veg_all_plots <- left_join(veg_all_plots, plots_df, by = "plot_match")
-#write.csv(veg_all_plots, "Veg-Soil-PlotFireSev.csv")
+write.csv(veg_all_plots, "Veg-Soil-PlotFireSev.csv")
 
 veg_all_sum <- veg_all_plots %>% group_by(logger) %>% 
   summarize(mean_veg = mean(Veg_depth_cm),
@@ -119,6 +121,8 @@ veg_all_sum <- veg_all_plots %>% group_by(logger) %>%
             stdev_lit = sd(Lit_depth_cm)) %>% 
   inner_join(all_plots[, c("plot_num", "logger", "area")], by = "logger")%>%
   mutate(logger_fac = as.factor(logger))
+
+
 
 library(ggplot2)
 
