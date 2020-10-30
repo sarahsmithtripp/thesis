@@ -111,7 +111,15 @@ plots@data$plot_num <- factor(fs_seq, levels = fs_seq)
 plots_df <- plots@data[, c("plot_match", "X_firemean","X_firestdev",
                            "plot_num")]
 all_plots_merge <- left_join(veg_all_plots, plots_df, by = c("plot_match"))
-write.csv(all_plots_merge, "Veg-Soil-PlotFireSev.csv")
+
+#decrease the number of columns to only those that are important for later analyses 
+all_plots_simp <- all_plots_merge[,c('plot', 'point', 'Measurement', 'logger', 'Date', 'Time', 'bulk density', 'Total Volume (cm^3)',
+                                     '%silt',
+                                     '%sand', "%clay", 'plot_match', 'area', 'Lit_depth_cm', 'Veg_depth_cm',
+                                     'Comments Oct', "Comments june-july", "Original Logger", 
+                                     'X_firemean', "X_firestdev", 'plot_num')]
+
+write.csv(all_plots_simp, "Veg-Soil-PlotFireSev.csv")
 
 veg_all_sum <- veg_all_plots %>% group_by(logger) %>% 
   summarize(mean_veg = mean(Veg_depth_cm),
