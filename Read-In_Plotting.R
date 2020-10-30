@@ -9,7 +9,9 @@ library(chron)
 #setwd("/Volumes/My Passport/BackUps/JuneFieldWork_Loggers")
 setwd("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements")
 #Create a folder repository for the data that you would like to read in
-file.list <- dir(paste0(getwd(),"/October"), full.names = T)
+file_oct.list <- dir(paste0(getwd(),"/October"), full.names = T)
+file_ju.list <- dir(paste0(getwd(),"/June-July"), full.names = T)
+file.list <- do.call(c, list(file_ju.list, file_oct.list))
 f_list <- file.list[which(grepl("binary", file.list))]
 print(f_list)
 
@@ -19,7 +21,6 @@ for (i in 1:length(f_list)){
   x <- data.frame(Logger = rep(paste0(substr(readin[2,3], 11, 18)), l)) #create an association
   x$DateTime <- readin[which(grepl("2020[.]", readin$V3)),3]#Time of measurement
   x$DateTime <- parse_datetime(x$DateTime, "%Y.%m.%d %H:%M")
-  last_time_measure <- tail(X$DateTime, n = 1)
   x$TZ <- readin[which(grepl("2020[.]", readin$V3)),4] #Time Zone of Measurement 
   x$T1 <- readin[c(which(grepl("2020[.]", readin$V3)) + 1 ), 1] #T1, soil measurment (deg C)
   x$T2 <- readin[c(which(grepl("2020[.]", readin$V3)) + 1 ), 2] #T2, surface measurment (deg C)
@@ -41,71 +42,37 @@ data_T <- data %>%
   pivot_longer(cols = c("T1", "T2", "T3"), names_to= "sensor", values_to = "temperature") 
 data_T$temperature <- as.numeric(data_T$temperature)
 
+
+## Not working with correction
+time_correction <- read.csv("times_difference.csv")
+
 #subset to within the study period (loggers are running all of the time)
 data_sub <-  data_T %>%
-  mutate(month = month(DateTime)) %>% 
+  mutate(DateTime_GMT = with_tz(DateTime, tzone ="America/Los_Angeles") ,
+                                month = month(DateTime_GMT)) %>% 
+  mutate(hour = hour(DateTime_GMT)) %>% 
   group_by(month) %>% 
-  mutate(mean = mean(temperature, na.rm = T)) %>%
+  mutate(mean = mean(temperature, na.rm = T)) %>% 
   filter(DateTime >= "2020-05-05")
 
+ggplot(filter(data_sub, sensor == "T1"), aes(hour, temperature, group = as.factor(month))) + 
+  geom_smooth(aes(color = as.factor(month))) + 
+  xlab("Hour of the Day") + 
+  labs(color = "Month of Recording") + 
+  theme_bw()
 
-### Bind the data to the actual data frame heheh 
-Veg_Data <- readxl::read_excel("/Volumes/My Passport/BackUps/Vegetation_Data_Clean.xlsx")
-Veg_Data$Logger<- as.factor(Veg_Data$Logger)
-Veg_Data$Plot <- as.factor(Veg_Data$Plot)
-
-
-#merge data into one dataframe 
-data_sub_veg <- left_join(data_sub, Veg_Data[,1:2], by = c("Logger"))
-#add plot names to the veg data_Set 
-
-plot_names <- c("cc", "4.66w","1.55w", "3.52w", "btw", "3.66w", "1.83w", "oldguy", "60.","cont")
-
-
-#name the dividers used to delineate between plots 
-plot_dividers <- c('w')
-
-#Seperate the plot data 
-plots <-  data_sub_veg%>% 
-  tidyr::separate(col = "Plot", into = c("plot", "point"), sep = 'W', extra = "drop")
-
-
-good_boy_plots<- filter(plots, !is.na(point))
-## delineate plots that were not well named and have to be seperated by hand :( )
-### write a function to deal with that bad boy data 
-bad_plot_naming_sad <- function(delimiter, grabber, og_data) {
-  data <- which(grepl(grabber, 
-                      og_data$Plot))
-  bad_boy_df <- og_data[data,]
-  bad_boy_df_tidy <- tidyr::separate(bad_boy_df, col = "Plot", into = c("plot", "point"), sep = delimiter, extra = "drop")
-  return(bad_boy_df_tidy)
-}
-
-
-### deal with that bad boy data god damn 
-## clearcut
-cc <- bad_plot_naming_sad(2, "CC", data_sub_veg)
-##oldguy 
-oldguy <- bad_plot_naming_sad(6, "OLDGUY", data_sub_veg)
-## 60 
-plot_60 <- bad_plot_naming_sad(3, "60.", data_sub_veg)
-#cont 
-cont <- bad_plot_naming_sad(4, "CONT", data_sub_veg)
-
-bad_plots <- rbind(cc, oldguy, plot_60, cont)
-
-
-#bind all data back into one data_frame 
-data_veg <- rbind(bad_plots, good_boy_plots)
+### Read in Vegetation and soil data 
+Veg_Data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Veg-Soil-PlotFireSev.csv")
+Veg_Data$logger<- as.factor(Veg_Data$logger)
 
 #block data by area because the flights are flown by area
 areas <- c("upperplots", "lowerplots", "midplots", "oldguy")
 
-data_veg <- data_veg  %>% 
-  mutate(area = as.factor(dplyr::case_when( plot == '60.' | plot == 'CONT' ~ "lowerplots",
-                                            plot == "1.55"| plot == "CC" | plot == "3.52" | plot == "4.66" ~ "upperplots",
-                                            plot == "1.83" | plot == "3.66" | plot == "BT" ~ "midplots",
-                                            plot == "OLDGUY" ~ "oldguy")),
+Veg_Data <- Veg_Data  %>% 
+  mutate(area = as.factor(dplyr::case_when( plot_num == 'fs2' | plot_num == 'fs3' ~ "lowerplots",
+                                            plot_num == "fs1"| plot_num == "fs6" | plot_num == "3.52" | plot_num == "fs5" ~ "upperplots",
+                                            plot_num == "fs8" | plot_num == "fs7" | plot_num == "fs10" ~ "midplots",
+                                            plot_num == "fs4" ~ "oldguy")),
          month = month(DateTime)) %>% 
   group_by(month, Logger) %>%
   mutate(mean_temp_month = mean(as.numeric(temperature), na.rm = T ),
