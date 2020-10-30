@@ -6,10 +6,11 @@
 library(tidyverse)
 library(lubridate)
 library(chron)
-setwd("/Volumes/My Passport/BackUps/JuneFieldWork_Loggers")
+#setwd("/Volumes/My Passport/BackUps/JuneFieldWork_Loggers")
+setwd("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements")
 #Create a folder repository for the data that you would like to read in
-f_list <- list.files(path = ".","^binary_(.*)0.csv$") #read all binary files ending with 0 (i.e. the only measurement)
-
+file.list <- dir(paste0(getwd(),"/October"), full.names = T)
+f_list <- file.list[which(grepl("binary", file.list))]
 print(f_list)
 
 for (i in 1:length(f_list)){ 
@@ -18,6 +19,7 @@ for (i in 1:length(f_list)){
   x <- data.frame(Logger = rep(paste0(substr(readin[2,3], 11, 18)), l)) #create an association
   x$DateTime <- readin[which(grepl("2020[.]", readin$V3)),3]#Time of measurement
   x$DateTime <- parse_datetime(x$DateTime, "%Y.%m.%d %H:%M")
+  last_time_measure <- tail(X$DateTime, n = 1)
   x$TZ <- readin[which(grepl("2020[.]", readin$V3)),4] #Time Zone of Measurement 
   x$T1 <- readin[c(which(grepl("2020[.]", readin$V3)) + 1 ), 1] #T1, soil measurment (deg C)
   x$T2 <- readin[c(which(grepl("2020[.]", readin$V3)) + 1 ), 2] #T2, surface measurment (deg C)
