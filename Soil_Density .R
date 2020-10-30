@@ -111,7 +111,7 @@ plots@data$plot_num <- factor(fs_seq, levels = fs_seq)
 plots_df <- plots@data[, c("plot_match", "X_firemean","X_firestdev",
                            "plot_num")]
 all_plots_merge <- left_join(veg_all_plots, plots_df, by = c("plot_match"))
-write.csv(veg_all_plots, "Veg-Soil-PlotFireSev.csv")
+write.csv(all_plots_merge, "Veg-Soil-PlotFireSev.csv")
 
 veg_all_sum <- veg_all_plots %>% group_by(logger) %>% 
   summarize(mean_veg = mean(Veg_depth_cm),
