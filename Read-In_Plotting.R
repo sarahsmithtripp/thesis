@@ -130,20 +130,22 @@ write.csv(full_data, "microclimate_veg_data.'csv")
 
 
 # Plot some data  ---------------------------------------------------------
+### Much fo this code has not been updated - must be updated to produce graphs 
+
 
 library(cowplot)
-ggplot(data_veg) +  
+ggplot(full_data) +  
   geom_boxplot(aes(area, temperature, color = sensor)) + 
   ylim(0,40)+
   facet_wrap(~ as.factor(month)) + 
   theme_bw()
 #geom_point(aes(month, mean(temperature, na.rm = T)))
 
-ggplot(data_veg) + 
+ggplot(full_data) + 
   geom_boxplot(aes(area, as.numeric(SM_Count), color = area)) + 
   facet_wrap(~as.factor(month)) + theme_bw()
 
-ggplot(data_veg, aes(group = as.factor(plot))) +  
+ggplot(full_data), aes(group = as.factor(plot))) +  
   geom_boxplot(aes(plot, temperature)) +
   geom_point(aes(plot, mean_temp_month, color = as.factor(point))) +
   ylim(0,40)+
@@ -151,7 +153,7 @@ ggplot(data_veg, aes(group = as.factor(plot))) +
   theme_bw()
 #geom_point(aes(month, mean(temperature, na.rm = T)))
 
-ggplot(data_veg) + 
+ggplot(full_data) + 
   geom_boxplot(aes(area, as.numeric(SM_Count), color = area)) + 
   facet_wrap(~as.factor(month)) + theme_bw()
 
