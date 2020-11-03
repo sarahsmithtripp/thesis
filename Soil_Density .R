@@ -111,7 +111,7 @@ plots@data$plot_num <- factor(fs_seq, levels = fs_seq)
 plots_df <- plots@data[, c("plot_match", "X_firemean","X_firestdev",
                            "plot_num")]
 all_plots_merge <- left_join(veg_all_plots, plots_df, by = c("plot_match"))
-
+all_plots_merge$point <- gsub("W", "", all_plots_merge$point)
 #decrease the number of columns to only those that are important for later analyses 
 all_plots_simp <- all_plots_merge[,c('plot', 'point', 'Measurement', 'logger', 'Date', 'Time', 'bulk density', 'Total Volume (cm^3)',
                                      '%silt',
@@ -121,7 +121,7 @@ all_plots_simp <- all_plots_merge[,c('plot', 'point', 'Measurement', 'logger', '
 
 write.csv(all_plots_simp, "Veg-Soil-PlotFireSev.csv")
 
-veg_all_sum <- veg_all_plots %>% group_by(logger) %>% 
+veg_all_sum <- all_plots_simp %>% group_by(logger) %>% 
   summarize(mean_veg = mean(Veg_depth_cm),
             stdev_veg = sd(Veg_depth_cm),
             mean_lit = mean(Lit_depth_cm), 
@@ -134,6 +134,7 @@ veg_all_sum <- veg_all_plots %>% group_by(logger) %>%
 library(ggplot2)
 
 #bulk density 
+all_plots <- left_join(all_plots, plots_df, by = "plot_match")
 bulk_density_graph <- ggplot(all_plots, aes(plot_num, `bulk density`, group = plot_num, color = plot_num)) + 
   geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8), aes(fill = plot_num)) + 
   geom_point(alpha = 0.7, sive = 1.2, position = 'jitter')+
@@ -237,7 +238,7 @@ veg_all_sum$plot <- as.factor(veg_all_sum$plot_num)
 veg_all_sum$plot_area <- do.call(paste0, veg_all_sum[, c("plot", "area")])
 veg_all_plots$plot_area <- do.call(paste0, veg_all_plots[, c("plot", "area")])
 lit_graph <- ggplot()+ 
-  geom_violin(data = veg_all_plots, aes(plot_num, Lit_depth_cm, color = plot_num, fill = plot_num), alpha = 0.4) + 
+  geom_violin(data = all_plots_simp, aes(plot_num, Lit_depth_cm, color = plot_num, fill = plot_num), alpha = 0.4) + 
   geom_point(data = veg_all_sum, aes(plot_num,mean_lit, group = logger, color = plot_num), alpha = 0.8, position = 'jitter') +
   ylab("Litter Depth (cm)") + 
   labs(color = "Area") + 
@@ -247,7 +248,7 @@ lit_graph <- ggplot()+
   guides(color = F, fill= F) + 
   cowplot::theme_cowplot()
 veg_graph <- ggplot()+ 
-  geom_violin(data = veg_all_plots, aes(plot_num, Veg_depth_cm, color = plot_num, fill = plot_num), alpha = 0.4 ) + 
+  geom_violin(data = all_plots_simp, aes(plot_num, Veg_depth_cm, color = plot_num, fill = plot_num), alpha = 0.4 ) + 
   geom_point(data = veg_all_sum, aes(plot_num,mean_veg, group = logger, color = plot_num), alpha = 0.8, position = 'jitter') +
   ylab("Vegetation Height (cm)") + 
   labs(color = "Area") + 
@@ -259,12 +260,12 @@ veg_graph <- ggplot()+
 
 
 legend <- get_legend(bulk_density_graph)
-save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/veg_litter.jpg', 
-          plot_grid(lit_graph, veg_graph, legend, nrow = 1, rel_widths = c(1,1,0.2)),
-          base_width =7.5, base_height = 4)
-save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/bulk_density.jpg', 
-          bulk_density_graph,
-          base_width =4.5, base_height = 3)
+# save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/veg_litter.jpg', 
+#           plot_grid(lit_graph, veg_graph, legend, nrow = 1, rel_widths = c(1,1,0.2)),
+#           base_width =7.5, base_height = 4)
+# save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/bulk_density.jpg', 
+#           bulk_density_graph,
+#           base_width =4.5, base_height = 3)
 
 test <- subset(veg_all_sum, plot_area == "OLDGUYoldguy")
   
@@ -295,4 +296,27 @@ View(all_plots %>%
 mean(all_plots$`bulk density`, na.rm = T)
 anova(lm(all_plots$`bulk density` ~ all_plots$plot_num))
 
-View(all_plots)
+
+
+library(lme4)
+
+lit_aov <- aov(Lit_depth_cm ~ plot_num + point*plot_num, data=all_plots_simp)
+
+summary(lit_aov)
+min(veg_all_sum$mean_lit)
+veg_all_sum %>% 
+        group_by(plot_num) %>%
+      summarise(mean = mean(mean_lit))
+sd(all_plots_simp$Lit_depth_cm)
+mean(all_plots_simp$Lit_depth_cm)
+hist(all_plots_simp$Lit_depth_cm)
+veg_aov <- aov(Veg_depth_cm ~ plot_num + point*plot_num, data=all_plots_simp)
+min(all_plots_simp$Veg_depth_cm)
+max(all_plots_simp$Veg_depth_cm)
+sd(all_plots_simp$Veg_depth_cm)
+
+veg_all_sum %>% 
+  group_by(plot_num) %>%
+  summarise(mean = mean(mean_veg))
+mean(veg_all_sum$mean_veg)
+summary(veg_aov)

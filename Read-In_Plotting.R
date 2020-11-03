@@ -53,17 +53,17 @@ data_sub <-  data_T %>%
   mutate(hour = hour(DateTime_GMT)) %>% 
   group_by(month) %>% 
   mutate(mean = mean(temperature, na.rm = T)) %>% 
-  filter(DateTime >= "2020-05-05")
+  filter(DateTime >= "2020-05-05" & DateTime <= "2020-10-10")
 
-ggplot(filter(data_sub, sensor == "T1"), aes(hour, temperature, group = as.factor(month))) + 
-  geom_smooth(aes(color = as.factor(month))) + 
-  xlab("Hour of the Day") + 
-  labs(color = "Month of Recording") + 
-  theme_bw()
+# ggplot(filter(data_sub, sensor == "T1"), aes(hour, temperature, group = as.factor(month))) + 
+#   geom_smooth(aes(color = as.factor(month))) + 
+#   xlab("Hour of the Day") + 
+#   labs(color = "Month of Recording") + 
+#   theme_bw()
 
 ### Read in Vegetation and soil data 
 Veg_Data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Veg-Soil-PlotFireSev.csv")
-Veg_Data$logger<- as.factor(Veg_Data$logger)
+Veg_Data$Logger<- as.character(Veg_Data$logger)
 
 #block data by area because the flights are flown by area
 areas <- c("upperplots", "lowerplots", "midplots", "oldguy")
@@ -72,22 +72,61 @@ Veg_Data <- Veg_Data  %>%
   mutate(area = as.factor(dplyr::case_when( plot_num == 'fs2' | plot_num == 'fs3' ~ "lowerplots",
                                             plot_num == "fs1"| plot_num == "fs6" | plot_num == "3.52" | plot_num == "fs5" ~ "upperplots",
                                             plot_num == "fs8" | plot_num == "fs7" | plot_num == "fs10" ~ "midplots",
-                                            plot_num == "fs4" ~ "oldguy")),
-         month = month(DateTime)) %>% 
-  group_by(month, Logger) %>%
-  mutate(mean_temp_month = mean(as.numeric(temperature), na.rm = T ),
-         mean_soil_moistre = mean(as.numeric(data_veg$SM_Count), na.rm = T))
+                                            plot_num == "fs4" ~ "oldguy")), 
+         plot_point = paste0(plot_num, point))
 
+Veg_Data_T <- Veg_Data %>% 
+  group_by(plot_point) %>% 
+  mutate(mean_lit = mean(Lit_depth_cm, na.rm = T),
+            mean_veg = mean(Veg_depth_cm, na.rm = T)) %>%
+  select(-c(X, Measurement,Lit_depth_cm, Veg_depth_cm)) %>% 
+  distinct()
 
-data_checker <- function(data, plot) {
-  subset <- subset(data, plot == plot)
-  subset$Logger <- as.numeric(as.character(subset$Logger))
-  c <- c(plot, length(unique(subset$month)), length(unique(subset$Logger)))
-  data <- list(c, data.frame(subset))
-  return(data)
-}
+Veg_Data$point <- gsub("W", "", Veg_Data$point)
 
-one <- data_checker(data_veg, plot_names[1])
+## add data for replaced loggers 
+final_loggers <- unique(Veg_Data$logger)
+final_loggers <- gsub(" ", "", final_loggers)
+orig_loggers_data <- filter(data_sub, Logger %in% c(unique(Veg_Data$Original.Logger)[2:4]))
+orig_loggers_data$Original.Logger <- as.numeric(orig_loggers_data$Logger)
+final_loggers_data <- filter(data_sub, Logger %in% final_loggers)
+#gather loggers that are not filtering correctly 
+bad_loggers <-  setdiff(unique(data_sub$Logger), unique(final_loggers_data$Logger))
+bad_loggers <- bad_loggers[! bad_loggers %in% c(unique(Veg_Data$Original.Logger)[2:4])]
+bad_loggers_data <- filter(data_sub, Logger %in% bad_loggers)
+
+# bind to final loggers
+final_loggers_data <- rbind(bad_loggers_data, final_loggers_data)
+
+#seperately add vegetation data 
+Veg_Data_T$Logger <- gsub(" ", "", Veg_Data_T$Logger)
+data_veg <- merge(final_loggers_data, Veg_Data_T, all.x = T, by = c("Logger"))
+setdiff(unique(final_loggers_data$Logger), unique(Veg_Data_T$Logger))
+
+#write to a csv to manually add the other data 
+  write.csv(data_veg, "final_logger_data.csv")
+
+orig_loggers_data_veg <-  orig_loggers_data %>% left_join(Veg_Data_T, by = "Original.Logger")
+names <- names(orig_loggers_data_veg) 
+renames <- match(c("Logger.x", "Logger.y"), names)
+names[renames] <- c("Original_logger", "Logger")
+names(orig_loggers_data_veg) <- names
+
+orig_loggers_data_veg <- select(orig_loggers_data_veg, -"Original_logger")
+
+setdiff(names(orig_loggers_data_veg), names(data_veg))
+setdiff(names(data_veg), names(orig_loggers_data_veg))
+
+order_names <- names(data_veg)
+
+## Order columns in the same border so that you can rbind them 
+orig_loggers_data_veg_ord <- orig_loggers_data_veg[, order_names]
+data_veg_ord <- data_veg[, order_names]
+
+##Bind all data together !! 
+full_data <- rbind(orig_loggers_data, data_veg_ord)
+
+write.csv(full_data, "microclimate_veg_data.'csv")
 
 
 # Plot some data  ---------------------------------------------------------
