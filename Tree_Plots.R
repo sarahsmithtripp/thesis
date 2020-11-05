@@ -234,7 +234,7 @@ clean_naming <- function(data){
   data@data <- tidyr::separate(data@data, name, c("Plot", "MicroclimatePt"), "-")
   data@data$Plot <- gsub("tree", "", data$Plot)
   
-  #fix the four plots with pooly named values 
+  #fix the four plots with poorly named values 
   data@data[12:15,2] <- rbind(c(22), c(11), c(10), c(12))
   return(data)
 }

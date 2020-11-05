@@ -53,4 +53,19 @@ ggplot(modified_times, aes(x = as.numeric(diff_time), group = as.factor(month(lo
 
 
 #store as CSV to read-in for and correct later data analyses 
-write.csv(modified_times, "times_difference.csv")
+#write.csv(modified_times, "times_difference.csv")
+
+
+
+# Calculate expected number of measurements  ------------------------------
+
+names(modified_oct_times) <- c("logger", "oct_comp_time", "oct_logger_time")
+names(modified_ju_times) <- c("logger", "ju_comp_time", "ju_logger_time")
+
+expected_values <- modified_ju_times %>% 
+  inner_join(modified_oct_times, by = "logger") %>% ## Change this to apply to all loggers but honestly fifty is enough for me! 
+  mutate(time_btw_data = difftime(ju_comp_time, oct_comp_time, units = c("mins")), 
+         expect_measurements = round(time_btw_data/15, 0))
+
+
+#write.csv(expected_values, "expected_number_measurements.csv")
