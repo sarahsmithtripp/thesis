@@ -36,7 +36,7 @@ LAI <- left_join(LAI, LAI_PlotSummaries, by = "Plot")
 
 View(LAI)
 
-#bulk density 
+#Leaf Area Index Variability  
 LAI_plot <- ggplot(LAI, aes(group = Plot, color = Plot)) + 
   geom_boxplot(aes(Plot, LAI), alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
   #geom_point(aes(Plot, mean_LAI), alpha = 0.8, position = 'jitter')+
