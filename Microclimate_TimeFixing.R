@@ -45,7 +45,7 @@ View(modified_times)
 modified_times$diff_time <- difftime(modified_times$comp_time, modified_times$logger_time, units = c("mins"))
 View(modified_times)
 
-ggplot(modified_times, aes(x = as.numeric(diff_time), group = as.factor(month(logger_time)))) + 
+ggplot(modified_times, aes(x = as.numeric(diff_time +420), group = as.factor(month(logger_time)))) + 
   geom_density(aes(fill = as.factor(month(logger_time))), alpha = 0.5) + 
   theme_bw() + 
   xlab("Difference between computer time and logger time (min)") + 
@@ -67,5 +67,32 @@ expected_values <- modified_ju_times %>%
   mutate(time_btw_data = difftime(ju_comp_time, oct_comp_time, units = c("mins")), 
          expect_measurements = round(time_btw_data/15, 0))
 
+expected_values$logger <- as.integer(gsub("_0", "", expected_values$logger))
+
 
 #write.csv(expected_values, "expected_number_measurements.csv")
+
+
+
+## read in the microclimate data to fix it :) 
+data <- read.csv("microclimate_veg_data.csv", header = T)
+
+counts <- data  %>%
+  left_join(expected_values, by = "logger") %>%
+  filter(!is.na("oct_comp_time")) %>% 
+  mutate(time_d = difftime(DateTime_GMT, ju_comp_time)) %>% 
+  filter(time_d > 0) %>% 
+  group_by(logger) %>% 
+  summarise(n_measures = n()) %>% 
+  ungroup()
+
+counts_v_expected <- expected_values %>% 
+  left_join(counts, by = "logger") %>%
+  mutate(differ = (n_measures/3) + expect_measurements,
+         month = month(ju_comp_time))
+
+
+ggplot(counts_v_expected, aes(group = month)) + 
+  geom_density(aes(differ, fill = month)) +
+  xlab("# of measurements vs. expected measurements") + 
+  theme_bw()
