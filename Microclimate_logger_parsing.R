@@ -1,0 +1,213 @@
+## code written to parse the loggers based on known errors 
+
+## SST 
+## NOvember 2020
+## From couch because ill 
+library(tidyverse)
+library(zoo)
+
+setwd("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements")
+## read in microclimate data 
+microclimate_veg_data <- read.csv("microclimate_veg_data.csv")
+
+
+
+
+
+# Work with Loggers that had their lids removed  --------------------------
+
+
+## take off measurements that had the lid removed
+filter_me <- function(data, sensor){
+  df <- data[,c('Logger', 'DateTime_GMT', 'sensor', 'temperature')]
+  t1_seq <- which(grepl(paste0(sensor), df$sensor))
+  df <- df[t1_seq,]
+  df <- df[,c('Logger', 'DateTime_GMT', 'temperature')]
+  names(df) <- c('Logger', 'DateTime_GMT', paste0(sensor))
+  return(df)
+}
+
+T1 <- filter_me(microclimate_veg_data, 'T1')
+T2 <- filter_me(microclimate_veg_data, 'T2')
+microclimate_veg_data_long <- microclimate_veg_data %>% 
+  filter(sensor == 'T3') %>%
+  rename(T3 = temperature) %>% 
+  select(-sensor) %>% 
+  left_join(T1, by = c('Logger', 'DateTime_GMT')) %>% 
+  left_join(T2, by = c('Logger', 'DateTime_GMT')) %>% 
+  mutate(lid_lost = paste0(Comments.Oct,"_",Comments.june.july)) 
+
+microclimate_veg_data_long$FID <- seq(1, dim(microclimate_veg_data_long)[1], by = 1)
+
+
+## select loggers that lost their lids twice 
+lid_lid <- which(grepl("lid_lid", microclimate_veg_data_long$lid_lost))
+
+#june_july <- shield_function(microclimate_veg_data_long[1:100000,], 'Comments.june.july', lid_lid)
+june_july <- which(grepl("lid", microclimate_veg_data_long$Comments.june.july))
+june_july_double_lost <- which(june_july %in% lid_lid)
+june_july_query <- june_july[-june_july_double_lost]
+june_july_df <- microclimate_veg_data_long[june_july_query,]
+good_bad_combine <- function(data, dates, near) {
+  if (near == F) {
+    data_bad <- data %>%
+      filter(DateTime_GMT < dates)
+    data_bad$T3 <- NA
+    data_good <- data %>%
+      filter(DateTime_GMT >= dates)
+    data_out <- rbind(data_bad, data_good)
+  }
+  ## are you shifting for earlier dates or later dates?
+  
+  else if (near == T) {
+    data_bad <- data %>%
+      filter(DateTime_GMT >= dates)
+    data_bad$T3 <- NA
+    data_good <- data %>%
+      filter(DateTime_GMT < dates)
+    data_out <- rbind(data_bad, data_good)
+  }
+}
+
+june_july_clean <- good_bad_combine(june_july_df, c("2020-07-04 12:30:00"), near = F)
+
+
+oct <- which(grepl("lid", microclimate_veg_data_long$Comments.Oct))
+oct_double_lost <- which(oct %in% lid_lid)
+oct_query <- oct[-oct_double_lost]
+oct_df <- microclimate_veg_data_long[oct_query,]
+oct_df_clean <- good_bad_combine(oct_df, c("2020-07-04 12:30:00"), near = T )
+
+double_lost <- microclimate_veg_data_long[lid_lid,]
+double_lost$T3 <- NA
+
+lid_issues_clean <- rbind(double_lost, oct_df_clean, june_july_clean)
+
+all_lid_issues <- c(oct_query, june_july_query, lid_lid)
+
+data_good_lids <- microclimate_veg_data_long[-all_lid_issues, ]
+
+data_lid_clean <- rbind(lid_issues_clean, data_good_lids)
+
+missing_data <- microclimate_veg_data_long %>% 
+  filter(FID %in% setdiff(microclimate_veg_data_long$FID, data_lid_clean$FID))
+
+data_lid_clean <- rbind(data_lid_clean, missing_data)
+
+
+# Work with loggers that were pulled out of the ground  -------------------
+data_lid_clean$day <- lubridate::yday(data_lid_clean$DateTime_GMT)
+data_lid_clean <- data_lid_clean %>% 
+  group_by(Logger, day) %>% 
+  mutate(soil_temp_sd = sd(T1, na.rm = T)) %>% 
+  arrange(soil_temp_sd)
+
+pulled_out <- which(grepl("pulled", data_lid_clean$lid_lost))
+pulled_out_df <- as.data.frame(data_lid_clean[pulled_out,])
+
+
+
+# ggplot(pulled_out_df, aes(DateTime_GMT, T1, group = as.factor(Logger))) + 
+#          geom_point(aes(color= as.factor(Logger))) + 
+#   geom_vline(xintercept = as.numeric(as.Date('2020-07-04 12:20:00'))) +
+#   facet_wrap(~as.factor(Logger))
+
+
+bad_loggers <- unique(pulled_out_df$Logger)
+
+find_bad_days <- function(bad_logger, data){
+  data_logger <- data %>% filter(Logger == bad_logger)
+  data_logger_sum <- data_logger %>% 
+    group_by(day) %>% 
+    summarize(soil_temp_sd = mean(soil_temp_sd))
+  rolled <- rollmean(zoo(data_logger_sum$soil_temp_sd, order.by = data_logger_sum$day), 7, aligng = c("right"), na.pad = T)
+  data_logger_sum$soil_tempmean_sd <- rolled
+  plots <- ggplot(data_logger_sum, aes(day, soil_tempmean_sd)) + geom_line()
+  return(list(data_logger_sum, plots, data_logger))
+}
+
+loggers <- lapply(bad_loggers, find_bad_days, data = pulled_out_df)
+for(i in 1:length(bad_loggers)){
+  print(min(loggers[[i]][[1]]$day))
+  print(bad_loggers[i])
+  print(loggers[[i]][[2]])
+}
+
+### manaully define good and bad days 
+good_days <- c(185, 185, 185, 204, 184, 183, NA, 184, 184, 184)
+above_below <- c(F, F, F, T, F, F, '', F,F, F)
+
+logger_good_days <- data.frame(bad_loggers, good_days, above_below)
+
+remove_bad_days <- function(df, good_day, above_below) {
+  if(above_below == F) {
+    logger_below <- df %>% filter(day < good_day)
+    logger_below[,c('SM_Count', 'T1', 'T2','T3')] <- NA
+    logger_above <- df %>% filter(day >= good_day)
+    logger_clean <- as.data.frame(rbind(logger_above, logger_below))
+  }
+ else if(above_below == T) { 
+    loggers_bad <- df %>% filter(day > good_day)
+    loggers_bad[,c('SM_Count', 'T1', 'T2', 'T3')] <- NA
+    logger_good <- df %>% filter(day =< good_day)  
+    logger_clean <- as.data.frame(rbind(loggers_bad, logger_good))}
+  else  {
+    df[,c('SM_Count', 'T1', 'T2', 'T3')] <- NA
+  }
+}
+
+
+
+
+logger_clean <- list()
+for(i in 1:length(bad_loggers)) { 
+  good_day <- logger_good_days[i, 2]
+  above_below_log <- logger_good_days[i, 3]
+  data <- remove_bad_days(loggers[[i]][[3]], good_day, above_below_log)
+  logger_clean[[i]] <- data 
+}
+
+loggers[[7]][[3]][c('SM_Count', 'T1', 'T2', 'T3')] <- NA
+
+logger_clean[[7]] <- loggers[[7]][[3]]
+
+
+clean_logger_data <- bind_rows(logger_clean) %>% 
+  distinct()
+
+
+missing_data <- pulled_out_df %>% 
+  filter(FID %in% setdiff(pulled_out_df$FID, clean_logger_data$FID))
+
+missing_data[,c('SM_Count', 'T1', 'T2', 'T3')] <- NA
+
+clean_logger_data <- rbind(missing_data, clean_logger_data)
+
+data_not_pulled <- data_lid_clean[-pulled_out, ]
+
+
+### bind together and write to a CSV because we have a clean mo-fo dataset!!!!!!!!!!!!!!
+
+data_clean <- rbind(clean_logger_data, data_not_pulled)
+data_clean <- distinct(data_clean)
+
+find_dups <- data_clean %>% 
+  group_by(FID) %>% 
+  summarize(n = n()) %>% 
+  filter(n >= 2)
+
+dups <- data_clean %>% 
+  filter(FID %in% find_dups$FID) %>% 
+  filter(is.na(T3)) ### select just the T3 data because that is the only one that is wrong 
+
+data_clean_no_dups <- data_clean %>% 
+  filter(!FID %in% dups$FID)
+
+
+data_finally_clean <- rbind(dups, data_clean_no_dups)
+
+names(data_finally_clean)
+
+drop_cols <- which(grepl(c('X', 'lid_lost','mean'), names(data_finally_clean)))
+data_finally_clean[,c('X', 'lid_lost','mean')] <- list(NULL)
+write.csv(data_finally_clean, "microclimate_veg_data_clean.csv")
