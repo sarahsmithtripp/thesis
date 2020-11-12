@@ -149,11 +149,10 @@ remove_bad_days <- function(df, good_day, above_below) {
  else if(above_below == T) { 
     loggers_bad <- df %>% filter(day > good_day)
     loggers_bad[,c('SM_Count', 'T1', 'T2', 'T3')] <- NA
-    logger_good <- df %>% filter(day =< good_day)  
-    logger_clean <- as.data.frame(rbind(loggers_bad, logger_good))}
-  else  {
-    df[,c('SM_Count', 'T1', 'T2', 'T3')] <- NA
-  }
+    logger_good <- df %>% filter(day > good_day)  
+    logger_clean <- as.data.frame(rbind(loggers_bad, logger_good))
+    }
+ 
 }
 
 
@@ -170,6 +169,7 @@ for(i in 1:length(bad_loggers)) {
 loggers[[7]][[3]][c('SM_Count', 'T1', 'T2', 'T3')] <- NA
 
 logger_clean[[7]] <- loggers[[7]][[3]]
+
 
 
 clean_logger_data <- bind_rows(logger_clean) %>% 
@@ -196,6 +196,7 @@ find_dups <- data_clean %>%
   summarize(n = n()) %>% 
   filter(n >= 2)
 
+
 dups <- data_clean %>% 
   filter(FID %in% find_dups$FID) %>% 
   filter(is.na(T3)) ### select just the T3 data because that is the only one that is wrong 
@@ -206,8 +207,42 @@ data_clean_no_dups <- data_clean %>%
 
 data_finally_clean <- rbind(dups, data_clean_no_dups)
 
+
 names(data_finally_clean)
 
 drop_cols <- which(grepl(c('X', 'lid_lost','mean'), names(data_finally_clean)))
 data_finally_clean[,c('X', 'lid_lost','mean')] <- list(NULL)
-write.csv(data_finally_clean, "microclimate_veg_data_clean.csv")
+#write.csv(data_finally_clean, "microclimate_veg_data_clean.csv")
+
+
+
+
+# Format data for submission to the soil temp database  -------------------
+bad_data <- which(is.na(data_finally_clean$plot_point))
+bad_data_df <- data_finally_clean[bad_data, c("T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Logger", "Original.Logger")]
+
+simple_data <- data_finally_clean[-bad_data, c("plot_point", "T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Logger", "Original.Logger")]
+
+bad_data_df <- bad_data_df %>%
+  mutate(plot_point = case_when(Logger == 94203211 ~ 'fs96', 
+         Logger == 94203258 ~ 'fs78', 
+         Logger == 94203265 ~ 'fs106'))
+
+simple_data_plots <- simple_data %>% 
+  full_join(bad_data_df, by = c("plot_point", "T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Original.Logger")) %>% 
+  mutate(Day = lubridate::mday(DateTime_GMT), 
+         Plotcode = paste0('CA_SST_', .$plot_point), 
+         Time = lubridate::hms(DateTime_GMT), 
+         Year = lubridate::year(DateTime_GMT))
+
+simple_data_plots$DateTime_GMT <- lubridate::ymd_hms(simple_data_plots$DateTime_GMT)
+simple_data_plots$Time <- format(simple_data_plots$DateTime_GMT, "%H-%M")
+
+
+## Drop columns that do not need to be in the dataset 
+
+simple_data_part <- simple_data_plots %>% 
+  select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point", "SM_Count"))
+
+
+write.csv(simple_data_part, "Microclimate_filtered_SoilTemp_11-Nov-2020.csv")
