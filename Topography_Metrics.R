@@ -100,6 +100,7 @@ library(foreach)
   
   cl <- parallel::makeCluster(detectCores())
   doParallel::registerDoParallel(cl)
+  
   elev <- foreach::foreach(radii = radii,
                           .combine = cbind, .packages = 'raster') %dopar% 
     extract(dem_raster, microclimate_locations, 
@@ -117,15 +118,11 @@ library(foreach)
      extract(terrain(dem_raster, opt = "TRI"), microclimate_locations, 
              buffer = radii, fun = mean,
              sp = F, stringAsFactors = F)
-  data <- data.frame(plot_point = microclimate_locations$plot_point, 
+  terrain_values <- data.frame(plot_point = microclimate_locations$plot_point, 
                      elev, aspect, slope, TRI)
-  names(data) <- names 
+  names(terrain_values) <- names 
   parallel::stopCluster(cl)
-  return(data) 
-} 
 
 
-terrain_values <- topography_metrics(microclimate_locations,dem_raster = dem_raster, radii)  
-
-write.csv(canopy_values, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/terrain_metrics.csv")
+write.csv(terrain_values, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/terrain_metrics.csv")
 
