@@ -1,6 +1,7 @@
 ###SST 
 ## 2020-Nov-03
 ## Election day (yikes)
+
 ##
 
 ## Output a CSV of canopy height and canopy cover at different distances from
