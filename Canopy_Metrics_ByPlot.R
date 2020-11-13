@@ -85,20 +85,23 @@ microclimate_locations@data <- microclimate_locations@data %>%
 sub <- filter(microclimate_locations@data, plot_point == "fs107")
 sub[2,c("plot_point")] <- "fs108"
 
-microclimate_locations@data <- microclimate_locations@data %>% filter(plt_pnt != "fs107")
+microclimate_locations@data <- microclimate_locations@data %>% filter(plot_point != "fs107")
 microclimate_locations@data <- rbind(microclimate_locations@data, sub)
 
+
+
+
+## WRite a function to derive canopy metrics
+radii <- c(2,5,10,15,20)
 
 radii_1 <- raster::extract(chm_raster,microclimate_locations,
                            buffer = radii[1], fun =mean, 
                            sp = F, stringsAsFactors = F)
 
-## WRite a function to derive canopy metrics
-radii <- c(2,5,10,15,20)
-
 ## Parallel processing of canopy metrics 
 
 library(doParallel)
+
 library(parallel)
 library(foreach)
 
