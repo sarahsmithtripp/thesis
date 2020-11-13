@@ -26,13 +26,14 @@ raster::plot(microclimate_locations, add = T)
 # Rename Microclimate Locations to Standard Format ------------------------
 #Read in plots with fire severity to order the loggers 
 #write sequence to name for numbers 
+plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
 seq <- seq(from =1 , to = 10, by = 1)
 fs_seq <- paste0("fs", seq)
 fire <- which(grepl("fire", names(plots@data)))
 plot <- which(grepl("plot", names(plots@data)))
 grabber_cols <- c(fire, plot)
 
-plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
+
 plots@data <- plots@data %>% 
   arrange(X_firemean) %>%
   mutate(
@@ -46,8 +47,6 @@ plots@data <- plots@data %>%
                                       plot == 'cc' ~ 'cc' ,
                                       plot == 'cont' ~ 'cont',
                                       plot == 'bt' ~ 'bt'))) 
-
-plots@data <- plots@data[,grabber_cols]
 
 
 plots@data$plot_num <- factor(fs_seq, levels = fs_seq)
@@ -72,6 +71,12 @@ microclimate_locations@data <- fix_errors(microclimate_locations@data)
 
 microclimate_locations@data <- microclimate_locations@data %>%
   mutate(plot_point = paste0(plot_num, point))
+sub <- filter(microclimate_locations@data, plot_point == "fs107")
+sub[2,c("plot_point")] <- "fs108"
+
+microclimate_locations@data <- microclimate_locations@data %>% filter(plot_point != "fs107")
+microclimate_locations@data <- rbind(microclimate_locations@data, sub)
+
 microclimate_locations@data[,c("field_1", "plot", "point", "path", "layer", "z_DEM", "time", "FID", "name")] <- list(NULL)
 
 microclimate_locations@data$hght_DEM <- raster::extract(dem_raster,microclimate_locations, fun = NULL,

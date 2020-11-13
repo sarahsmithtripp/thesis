@@ -27,14 +27,69 @@ chm_raster <- raster::raster(chm_tif)
 
 
 # Load canopy Data 
-canopy_cover <- raster::raster("D:/Data/SmithTripp/Gavin_Lake/3D_models/Las_Catalog/canopycov_2m_10cmres.tif")
+canopy_cover_raster <- raster::raster("D:/Data/SmithTripp/Gavin_Lake/3D_models/Las_Catalog/canopycov_2m_10cmres.tif")
 
 #Add in Microclimate locations 
-microclimate_locations <- readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/microclimate_loc.shp")
+#Add in Microclimate locations 
+microclimate_locations <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/GPX_Waypoints/microclimate_location_oct-22-2020.shp")
 raster::plot(microclimate_locations)
 
 
-radii_1 <- raster::extract(chm,microclimate_locations,
+
+# Rename Microclimate Locations to Standard Format ------------------------
+#Read in plots with fire severity to order the loggers 
+#write sequence to name for numbers 
+seq <- seq(from =1 , to = 10, by = 1)
+fs_seq <- paste0("fs", seq)
+fire <- which(grepl("fire", names(plots@data)))
+plot <- which(grepl("plot", names(plots@data)))
+grabber_cols <- c(fire, plot)
+plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
+plots@data <- plots@data %>% 
+  arrange(X_firemean) %>%
+  mutate(
+    plot_match = as.factor(case_when( plot == '60' ~ "60",
+                                      plot == '4.66' ~ '4.66',
+                                      plot == '3.52' ~ '3.52',
+                                      plot == '1.83' ~ '1.83', 
+                                      plot == '1.55' ~ '1.55',
+                                      plot == '3.66' ~ '3.66',
+                                      plot == 'oldguy' ~ 'oldguy', 
+                                      plot == 'cc' ~ 'cc' ,
+                                      plot == 'cont' ~ 'cont',
+                                      plot == 'bt' ~ 'bt'))) 
+
+plots@data <- plots@data[,grabber_cols]
+plots@data$plot_num <- factor(fs_seq, levels = fs_seq)
+
+## Bind Plots to Microclimate_locations 
+
+microclimate_locations@data <- microclimate_locations@data %>% 
+  left_join(plots@data) %>% 
+  distinct()
+
+## Fix poorly named points, within a function to double check for errors 
+fix_errors <- function(points) {
+  errors <- which(points$point < 0 )
+  if(length(errors) > 1)
+    print("You have to fix some shit")
+  else
+    points[errors, c('point')] <- 5
+  return(points)
+}
+
+microclimate_locations@data <- fix_errors(microclimate_locations@data)
+
+microclimate_locations@data <- microclimate_locations@data %>%
+  mutate(plot_point = paste0(.$plot_num, .$point))
+sub <- filter(microclimate_locations@data, plot_point == "fs107")
+sub[2,c("plot_point")] <- "fs108"
+
+microclimate_locations@data <- microclimate_locations@data %>% filter(plt_pnt != "fs107")
+microclimate_locations@data <- rbind(microclimate_locations@data, sub)
+
+
+radii_1 <- raster::extract(chm_raster,microclimate_locations,
                            buffer = radii[1], fun =mean, 
                            sp = F, stringsAsFactors = F)
 
@@ -59,7 +114,7 @@ library(foreach)
                                             buffer = radii, fun = mean,
                                             sp = F, stringAsFactors = F)
   canopy_cover <- foreach::foreach(radii = radii, .combine = cbind, .packages = 'raster') %dopar%
-    extract(canopy_cover, microclimate_locations, 
+    extract(canopy_cover_raster, microclimate_locations, 
             buffer = radii, fun = mean,
             sp = F, stringAsFactors = F)
   data <- data.frame(plot_point = microclimate_locations$plot_point, 
