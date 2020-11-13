@@ -74,7 +74,7 @@ microclimate_locations@data <- microclimate_locations@data %>%
   mutate(plot_point = paste0(plot_num, point))
 microclimate_locations@data[,c("field_1", "plot", "point", "path", "layer", "z_DEM", "time", "FID", "name")] <- list(NULL)
 
-microclimate_locations@data$hght_DEM <- raster::extract(dem_raster,microclimate_locations, fun = NULL)
+microclimate_locations@data$hght_DEM <- raster::extract(dem_raster,microclimate_locations, fun = NULL,
                            sp = F, stringsAsFactors = F)
 
 
@@ -95,7 +95,7 @@ library(parallel)
 library(foreach)
 
 ## process for topography metrics (taken out of function because not working)
-  names <- c("plot_point", paste("elev radius", radii), paste("aspect radius", radii), paste("slope radius", radii), paste("TRI radius", radii))
+  names <- c("plot_point", paste0("elevation_r", radii, "m"), paste0("aspect r", radii, "m"), paste0("slope r", radii,"m"), paste("TRI r", radii, "m"))
   length <- length(microclimate_locations$plot_point)
   
   cl <- parallel::makeCluster(detectCores())
