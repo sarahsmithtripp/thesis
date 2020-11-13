@@ -80,7 +80,7 @@ fix_errors <- function(points) {
 microclimate_locations@data <- fix_errors(microclimate_locations@data)
 
 microclimate_locations@data <- microclimate_locations@data %>%
-  mutate(plot_point = paste0(plot_num, point))
+  mutate(plot_point = paste0(.$plot_num, .$point))
 
 
 radii_1 <- raster::extract(chm,microclimate_locations,
@@ -97,19 +97,18 @@ library(parallel)
 library(foreach)
 
 
-canopy_metrics <- function(microclimate_locations, chm, cover, radii) {
-  names <- c("plot_point", paste("CHM radius", radii), paste("Cover radius", radii))
+  names <- c("plot_point", paste("DAP_Canopy_Height r", radii, "m"), paste("DAP_Canopy_Cover_r", radii, "m"))
   length <- length(microclimate_locations$plot_point)
 
   cl <- parallel::makeCluster(detectCores())
   doParallel::registerDoParallel(cl)
   chm <- foreach::foreach(radii = radii,
                           .combine = cbind, .packages = 'raster') %dopar% 
-                            extract(chm, microclimate_locations, 
+                            extract(chm_raster, microclimate_locations, 
                                             buffer = radii, fun = mean,
                                             sp = F, stringAsFactors = F)
   canopy_cover <- foreach::foreach(radii = radii, .combine = cbind, .packages = 'raster') %dopar%
-    extract(cover, microclimate_locations, 
+    extract(canopy_cover, microclimate_locations, 
             buffer = radii, fun = mean,
             sp = F, stringAsFactors = F)
   data <- data.frame(plot_point = microclimate_locations$plot_point, 
@@ -117,11 +116,8 @@ canopy_metrics <- function(microclimate_locations, chm, cover, radii) {
                      canopy_cover)
   names(data) <- names 
   parallel::stopCluster(cl)
-  return(data) 
-} 
 
 
-canopy_values <- canopy_metrics(microclimate_locations,chm = chm_raster, cover = canopy_cover, radii)  
   
-write.csv(canopy_values, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/canopy_metrics.csv")
+write.csv(data, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/canopy_metrics.csv")
 
