@@ -23,6 +23,7 @@ bad_plot_naming_sad <- function(delimiter, grabber, og_data) {
   bad_boy_df_tidy <- tidyr::separate(bad_boy_df, col = "ID...1", into = c("plot", "point"), sep = delimiter, extra = "merge")
   return(bad_boy_df_tidy)
 }
+
 ### deal with that bad boy data god damn 
 ## clearcut
 cc <- bad_plot_naming_sad(2, "CC", soil_data)
@@ -117,7 +118,7 @@ all_plots_simp <- all_plots_merge[,c('plot', 'point', 'Measurement', 'logger', '
                                      '%silt',
                                      '%sand', "%clay", 'plot_match', 'area', 'Lit_depth_cm', 'Veg_depth_cm',
                                      'Comments Oct', "Comments june-july", "Original Logger", 
-                                     'X_firemean', "X_firestdev", 'plot_num')]
+                                     'X_firemean', "X_firestdev", 'plot_num', 'Soil Type')]
 
 write.csv(all_plots_simp, "Veg-Soil-PlotFireSev.csv")
 
@@ -126,7 +127,7 @@ veg_all_sum <- all_plots_simp %>% group_by(logger) %>%
             stdev_veg = sd(Veg_depth_cm),
             mean_lit = mean(Lit_depth_cm), 
             stdev_lit = sd(Lit_depth_cm)) %>% 
-  inner_join(all_plots[, c("plot_num", "logger", "area")], by = "logger")%>%
+  inner_join(all_plots_merge[, c("plot_num", "logger", "area")], by = "logger")%>%
   mutate(logger_fac = as.factor(logger))
 
 
