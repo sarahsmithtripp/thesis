@@ -2,6 +2,8 @@
 
 # This is a script written to calculate all of the variables to be inpuit 
 # into microclimate modelign 
+## Deprecated as of Nov 16th 2020 
+
 
 #Started Oct-22-2020
 #Modeling (in order of inclusion)

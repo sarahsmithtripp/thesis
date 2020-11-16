@@ -231,7 +231,7 @@ bad_data_df <- bad_data_df %>%
 simple_data_plots <- simple_data %>% 
   full_join(bad_data_df, by = c("plot_point", "T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Original.Logger")) %>% 
   mutate(Day = lubridate::mday(DateTime_GMT), 
-         Plotcode = paste0('CA_SST_', .$plot_point), 
+         Plotcode = paste0('CA_ST_', .$plot_point), 
          Time = lubridate::hms(DateTime_GMT), 
          Year = lubridate::year(DateTime_GMT))
 
@@ -245,4 +245,4 @@ simple_data_part <- simple_data_plots %>%
   select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point", "SM_Count"))
 
 
-write.csv(simple_data_part, "Microclimate_filtered_SoilTemp_11-Nov-2020.csv")
+write.csv(simple_data_part, "Microclimate_filtered_SoilTemp_13-Nov-2020.csv")
