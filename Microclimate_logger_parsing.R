@@ -242,9 +242,9 @@ simple_data_plots$Time <- format(simple_data_plots$DateTime_GMT, "%H-%M")
 
 soil_data_TMS <- read_excel("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Sample_Sites_Soil.xlsx", sheet = "Sheet1")
 soil_data_TMS <- soil_data_TMS[,c('TMS_SoilType','logger...28')]
-names(soil_data_TMS) <- c('TMS_SoilType','Logger.x')
+names(soil_data_TMS) <- c('TMS_SoilType','Logger.x') ## rename soil data to join
 sm_logger.x <- simple_data_plots %>% filter(Logger.x !='NA') %>% left_join(soil_data_TMS)
-names(soil_data_TMS) <- c('TMS_SoilType', 'Logger.y')
+names(soil_data_TMS) <- c('TMS_SoilType', 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
 sm_logger.y <- simple_data_plots %>% filter(Logger.y !='NA') %>% left_join(soil_data_TMS)
 sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
 sm_data <- sm_data_soil[,c('TMS_SoilType', 'Logger.x','Logger.y', 'SM_Count', 'DateTime_GMT')] 
@@ -255,8 +255,10 @@ source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=TRUE)
 sm_data_soils <- left_join(sm_data_soil, soils_eq_df) 
 dim(sm_data_soils) 
 sm_data_soils[,c('a','b','c')] <- apply(sm_data_soils[,c('a','b','c')], 2, as.numeric)
+
+### calibrate using provided TMS codes 
 sm_data_soils$vol_sm <-  sm_data_soils$a*(sm_data_soils$SM_Count)^2 + sm_data_soils$b*(sm_data_soils$SM_Count) - sm_data_soils$c
-sm_data_soils <- sm_data_soils %>% 
+sm_data_soils <- sm_data_soils %>% ## drop uncessary columns 
   select(-c('a','b','c'))
 
 dim(sm_data_soils)
