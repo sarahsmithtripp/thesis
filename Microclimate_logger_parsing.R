@@ -247,7 +247,8 @@ sm_logger.x <- simple_data_plots %>% filter(Logger.x !='NA') %>% left_join(soil_
 names(soil_data_TMS) <- c('TMS_SoilType', 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
 sm_logger.y <- simple_data_plots %>% filter(Logger.y !='NA') %>% left_join(soil_data_TMS)
 sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
-sm_data <- sm_data_soil[,c('TMS_SoilType', 'Logger.x','Logger.y', 'SM_Count', 'DateTime_GMT')] 
+
+
 ### run script to get model coefficients 
 source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=TRUE)
 
