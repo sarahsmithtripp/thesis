@@ -243,13 +243,27 @@ simple_data_plots$Time <- format(simple_data_plots$DateTime_GMT, "%H-%M")
 soil_data_TMS <- read_excel("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Sample_Sites_Soil.xlsx", sheet = "Sheet1")
 soil_data_TMS <- soil_data_TMS[,c('TMS_SoilType','logger...28')]
 names(soil_data_TMS) <- c('TMS_SoilType','Logger.x')
-simple_data_plots_soil <- left_join(simple_data_plots, soil_data_TMS)
+sm_logger.x <- simple_data_plots %>% filter(Logger.x !='NA') %>% left_join(soil_data_TMS)
+names(soil_data_TMS) <- c('TMS_SoilType', 'Logger.y')
+sm_logger.y <- simple_data_plots %>% filter(Logger.y !='NA') %>% left_join(soil_data_TMS)
+sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
+sm_data <- sm_data_soil[,c('TMS_SoilType', 'Logger.x','Logger.y', 'SM_Count', 'DateTime_GMT')] 
+### run script to get model coefficients 
+source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=TRUE)
 
 
+sm_data_soils <- left_join(sm_data_soil, soils_eq_df) 
+dim(sm_data_soils) 
+sm_data_soils[,c('a','b','c')] <- apply(sm_data_soils[,c('a','b','c')], 2, as.numeric)
+sm_data_soils$vol_sm <-  sm_data_soils$a*(sm_data_soils$SM_Count)^2 + sm_data_soils$b*(sm_data_soils$SM_Count) - sm_data_soils$c
+sm_data_soils <- sm_data_soils %>% 
+  select(-c('a','b','c'))
+
+dim(sm_data_soils)
 ## Drop columns that do not need to be in the dataset 
 
-simple_data_part <- simple_data_plots %>% 
-  select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point", "SM_Count"))
+simple_data_part <- sm_data_soils %>% 
+  select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point", "SM_Count", "TMS_SoilType", "vol_sm"))
 
 
-write.csv(simple_data_part, "Microclimate_filtered_SoilTemp_13-Nov-2020.csv")
+write.csv(simple_data_part, "Microclimate_filtered_Vol_Sm_Nov-22-20.csv")
