@@ -238,6 +238,13 @@ simple_data_plots <- simple_data %>%
 simple_data_plots$DateTime_GMT <- lubridate::ymd_hms(simple_data_plots$DateTime_GMT)
 simple_data_plots$Time <- format(simple_data_plots$DateTime_GMT, "%H-%M")
 
+## Read in soil data
+
+soil_data_TMS <- read_excel("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Sample_Sites_Soil.xlsx", sheet = "Sheet1")
+soil_data_TMS <- soil_data_TMS[,c('TMS_SoilType','logger...28')]
+names(soil_data_TMS) <- c('TMS_SoilType','Logger.x')
+simple_data_plots_soil <- left_join(simple_data_plots, soil_data_TMS)
+
 
 ## Drop columns that do not need to be in the dataset 
 

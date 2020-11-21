@@ -19,21 +19,35 @@ soil_properties <- data.frame(sand, loamy_sand_a, loamy_sand_b,
                               loam, silt_loam)
 
 
+soils <- c('loam','Loamy sand B','Sandy loam B','Loamy sand A ','loam','loam','loam','loam','Silt Loam','Silt Loam','Sandy loam B','Loamy sand B','Sandy loam B','Sandy loam B','Silt Loam','Sandy loam B','Sandy loam B','Sandy loam B','Sandy loam B','Sandy loam B','Sandy loam B','Sandy loam B','Sandy loam B','loam','Sandy loam B','loam','loam','Silt Loam','Sandy loam B','Silt Loam','Silt Loam','Sandy loam B','Silt Loam','loam','Sandy loam B','Silt Loam','Sandy loam B','Silt Loam','Silt Loam','loam','loam','loam','Silt Loam','Sandy loam B','Sandy loam B','Sandy loam B','loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam','Sandy loam B','Silt Loam','Silt Loam','loam','Silt Loam','loam','loam','loam','Silt Loam','Silt Loam','Sandy loam B','Silt Loam','Silt Loam','Loamy sand A ','loam','Silt Loam','loam','Silt Loam','Sandy loam B','Silt Loam','loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam','loam','Silt Loam','Silt Loam','Sandy loam B','loam','Sandy loam B','Silt Loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam','Silt Loam')
 
+
+soil_names <- unique(soils)
 #define equation for calibration 
 
 sand_eq <- c(-0.000000003,	0.000161192,	-0.109956505)
-loamy_sand_a_eq <- c(-0.000000019,	0.00026561,	-0.154089291)
-loamy_sand_b_eq <- c(-0.000000023,	0.000282473,	-0.167211156)
-loam_eq <- c(-0.000000051,	0.000397984,	-0.291046437)
+loamy_sand_a_eq <- c(-0.000000019,	0.00026561,	-0.154089291, "Loamy sand A")
+loamy_sand_b_eq <- c(-0.000000023,	0.000282473,	-0.167211156, "Loamy sand B")
+loam_eq <- c(-0.000000051,	0.000397984,	-0.291046437, "loam")
 sandy_loam_a_eq <- c(-0.000000038,	0.000339449,	-0.214921782)
-sandy_loam_b_eq <- c(-9e-10,	0.000261847,	-0.158618303)
-silt_loam_eq <- c(0.000000017,	0.000118119,	-0.101168511)
+sandy_loam_b_eq <- c(-9e-10,	0.000261847,	-0.158618303, "Sandy loam B")
+silt_loam_eq <- c(0.000000017,	0.000118119,	-0.101168511, "Silt Loam")
 
-soil_eq <- data.frame(sand_eq, loamy_sand_a_eq, loamy_sand_b_eq,
-                      sandy_loam_a_eq, sandy_loam_b_eq,
-                      loam_eq, silt_loam_eq)
 
-parameters_eq <- function(a,b,c){
+
+soils_eq_df <- data.frame(TMS_SoilType = soil_names, 
+                          a = c(loam_eq[1], loamy_sand_b_eq[1], sandy_loam_b_eq[1], loamy_sand_a_eq[1], silt_loam_eq[1]), 
+                          b = c(loam_eq[2], loamy_sand_b_eq[2], sandy_loam_b_eq[2], loamy_sand_a_eq[2], silt_loam_eq[2]), 
+                          c = c(loam_eq[3], loamy_sand_b_eq[3], sandy_loam_b_eq[3], loamy_sand_a_eq[3], silt_loam_eq[3])) 
+
+parameters_eq <- function(a,b,c, x){
   soil_moist <- a*(x)^2 + b*(x) - c
+  return(soil_moist)
 }
+
+
+
+values <- seq(0, 3500, by = 0.05)
+
+
+#plot(data$values, data$loam_curve)
