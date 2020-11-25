@@ -4,13 +4,78 @@
 library(tidyverse)
 
 
-climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_Temperature_Data.csv", header = T)
+climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_filtered_Vol_Sm_Nov-22-20.csv", header = T)
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10")
+
 
 meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
 meta_data <- meta_data[2:nrow(meta_data), ]
 
+
+# 
+
+# add a section to look at the variation between different soil ty --------
+soil_moisture_expl <- climate_data %>% 
+  mutate(Plotcode = as.factor(Plotcode), 
+         DateTime_GMT = lubridate::ymd_hms(DateTime_GMT), 
+         DateTime = as.Date(DateTime_GMT),
+         Hour =lubridate::hour(DateTime_GMT), 
+         DateTime_Hour = ymd_h(paste(DateTime, Hour))) %>%
+  group_by(DateTime_GMT, TMS_SoilType) %>% 
+  mutate(sm_mean_soiltype = mean(vol_sm, na.rm = T), 
+         sm_mean_ct = mean(SM_Count, na.rm = T))# %>%
+  group_by(DateTime_Hour, Plotcode) %>% 
+  summarize(sm_mean_plot_d = mean(vol_sm, na.rm = T), 
+         T1_mean_h = mean(T1, na.rm = T), 
+         T2_mean_h = mean(T2, na.rm = T), 
+         T3_mean_h = mean(T3, na.rm = T))
+
+graph.list <- list()
+n <- seq(0, 90, by = 20)
+graph_temps <- function(num, soil_moisture_expl, var) {
+  subset_data_q <- levels(soil_moisture_expl$Plotcode)[num:(num+19)]
+  subset_data <- filter(soil_moisture_expl, Plotcode %in% subset_data_q)
+  if(var == 'T1') {
+    graph <- ggplot(subset_data) + 
+      geom_point(aes(DateTime_Hour, T1_mean_h, color = Plotcode), size = 0.2, shape = 16) + 
+      scale_x_datetime(date_labels = "%B") +
+      theme_bw() + 
+      ylab("Temperature T1")
+    graph
+    #cowplot::save_plot(graph)
+  }
+  else if( var == 'T2') { 
+    graph <- ggplot(subset_data) + 
+      geom_point(aes(DateTime_Hour, T2_mean_h, color = Plotcode), size = 0.2, shape = 17) + 
+      scale_x_datetime(date_labels = "%B") +
+      theme_bw() + 
+      ylab("Temperature T2") }
+  else if(var == 'T3') {
+    graph <- ggplot(subset_data) + 
+    geom_point(aes(DateTime_Hour, T3_mean_h, color = Plotcode), size = 0.2, shape = 18) + 
+    scale_x_datetime(date_labels = "%B") +
+    theme_bw() + 
+    ylab("Temperature T3") }
+  return(graph)
+}
+
+graph_fs101.21 <- graph_temps(n[1], soil_moisture_expl = soil_moisture_expl, var = 'T1')
+graph_fs22.43 <- graph_temps(n[2], soil_moisture_expl = soil_moisture_expl)
+graph_fs44.65 <- graph_temps(n[3], soil_moisture_expl = soil_moisture_expl)
+graph_fs66.87 <- graph_temps(n[4], soil_moisture_expl = soil_moisture_expl)
+graph_fs88.99 <- graph_temps(n[5], soil_moisture_expl = soil_moisture_expl)
+
+plot_compiled <- cowplot::plot_grid(graph_fs101.21, graph_fs22.43, graph_fs44.65, graph_fs66.87, graph_fs88.99, nrow = 5)  
+
+ggsave(filename = "Temperatures.jpeg", plot = plot_compiled, dpi = 800, height = 15, width = 18)
+graph.list[[1]]
+
+
+ggplot(soil_moisture_expl, aes(group = as.factor(TMS_SoilType))) + 
+         geom_line(aes(DateTime_GMT, sm_mean_ct, color = as.factor(TMS_SoilType)))
+  #geom_point(aes(DateTime_GMT, sm_mean_plot_d), size = 0.1, alpha = 0.4) + 
+  #facet_wrap(~TMS_SoilType)
 
 # develop microclimate summary data  --------------------------------------
 
@@ -201,7 +266,7 @@ lm_random_plots_graphs <- function(climate_modeling, resp_variable, det_variable
   
   
    #write models
- lm1 <- lme(y~ x + month, data = data_1a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude, correlation = corAR1( form = 1|month))
+ lm1 <- lme(y~ x + month, data = data_1a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude, correlation = corAR1(form = 1|month))
  lm2 <- lme(y~x +as.factor(month), data = data_2a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
  lm3 <- lme(y~x +as.factor(month), data = data_3a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
  

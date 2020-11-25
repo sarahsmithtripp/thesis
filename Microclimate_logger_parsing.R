@@ -48,7 +48,7 @@ june_july <- which(grepl("lid", microclimate_veg_data_long$Comments.june.july))
 june_july_double_lost <- which(june_july %in% lid_lid)
 june_july_query <- june_july[-june_july_double_lost]
 june_july_df <- microclimate_veg_data_long[june_july_query,]
-good_bad_combine <- function(data, dates, near) {
+good_bad_combine <- function(data, dates, near) { ## near is that your are shifting to the closer dates or those are the correct dates, and far is that they are prior dates you want to null
   if (near == F) {
     data_bad <- data %>%
       filter(DateTime_GMT < dates)
@@ -133,7 +133,7 @@ for(i in 1:length(bad_loggers)){
   print(loggers[[i]][[2]])
 }
 
-### manaully define good and bad days 
+### manaully define good and bad days  based on graphs produced above
 good_days <- c(185, 185, 185, 204, 184, 183, NA, 184, 184, 184)
 above_below <- c(F, F, F, T, F, F, '', F,F, F)
 
@@ -210,8 +210,8 @@ data_finally_clean <- rbind(dups, data_clean_no_dups)
 
 names(data_finally_clean)
 
-drop_cols <- which(grepl(c('X', 'lid_lost','mean'), names(data_finally_clean)))
 data_finally_clean[,c('X', 'lid_lost','mean')] <- list(NULL)
+#data_finally_clean$DateTime_GMT <- lubridate::ymd_hms(data_finally_clean$DateTime_GMT)
 #write.csv(data_finally_clean, "microclimate_veg_data_clean.csv")
 
 
@@ -219,38 +219,47 @@ data_finally_clean[,c('X', 'lid_lost','mean')] <- list(NULL)
 
 # Format data for submission to the soil temp database  -------------------
 bad_data <- which(is.na(data_finally_clean$plot_point))
-bad_data_df <- data_finally_clean[bad_data, c("T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Logger", "Original.Logger")]
+bad_data_df <- data_finally_clean[bad_data, c("T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Logger", "Original.Logger", "Comments.june.july", "FID")]
 
-simple_data <- data_finally_clean[-bad_data, c("plot_point", "T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Logger", "Original.Logger")]
+simple_data <- data_finally_clean[-bad_data, c("plot_point", "T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Logger", "Original.Logger", "Comments.june.july", "FID")]
 
 bad_data_df <- bad_data_df %>%
   mutate(plot_point = case_when(Logger == 94203211 ~ 'fs96', 
          Logger == 94203258 ~ 'fs78', 
          Logger == 94203265 ~ 'fs106'))
+library(lubridate)
+get_time <- function(time) {
+  time %>%
+    str_split(" ") %>%
+    map_chr(2) %>%
+    hms()
+}
 
-simple_data_plots <- simple_data %>% 
-  full_join(bad_data_df, by = c("plot_point", "T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Original.Logger")) %>% 
-  mutate(Day = lubridate::mday(DateTime_GMT), 
+simple_data_plots <- simple_data %>%
+  full_join(bad_data_df, by = c("plot_point", "T1", "T2", "T3", "SM_Count", "DateTime_GMT", "month", "Original.Logger", "Comments.june.july", "FID")) %>%
+  mutate(DateTime_GMT = lubridate::ymd_hms(DateTime_GMT), 
+         Day = lubridate::mday(DateTime_GMT), 
          Plotcode = paste0('CA_ST_', .$plot_point), 
-         Time = lubridate::hms(DateTime_GMT), 
-         Year = lubridate::year(DateTime_GMT))
-
-simple_data_plots$DateTime_GMT <- lubridate::ymd_hms(simple_data_plots$DateTime_GMT)
-simple_data_plots$Time <- format(simple_data_plots$DateTime_GMT, "%H-%M")
+         #Time = lubridate::hms(DateTime_GMT), 
+         Year = lubridate::year(DateTime_GMT),
+        Time = get_time(DateTime_GMT)) %>% 
+  filter(DateTime_GMT >= "2020-05-13")
 
 ## Read in soil data
 
-soil_data_TMS <- read_excel("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Sample_Sites_Soil.xlsx", sheet = "Sheet1")
+soil_data_TMS <- readxl::read_excel("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Sample_Sites_Soil.xlsx", sheet = "Sheet1")
 soil_data_TMS <- soil_data_TMS[,c('TMS_SoilType','logger...28')]
 names(soil_data_TMS) <- c('TMS_SoilType','Logger.x') ## rename soil data to join
-sm_logger.x <- simple_data_plots %>% filter(Logger.x !='NA') %>% left_join(soil_data_TMS)
+
+sm_logger.x.fickle <- simple_data_plots %>% filter(Logger.x !='NA') %>% filter(Logger.x > 94203290) %>% filter(DateTime_GMT > "2020-07-03")
+sm_logger.x <- simple_data_plots %>% filter(Logger.x != 'NA')  %>% filter(Logger.x <= 94203290) %>%  full_join(sm_logger.x.fickle) %>% left_join(soil_data_TMS)
 names(soil_data_TMS) <- c('TMS_SoilType', 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
 sm_logger.y <- simple_data_plots %>% filter(Logger.y !='NA') %>% left_join(soil_data_TMS)
 sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
 
 
 ### run script to get model coefficients 
-source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=TRUE)
+source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=F)
 
 
 sm_data_soils <- left_join(sm_data_soil, soils_eq_df) 
@@ -263,10 +272,38 @@ sm_data_soils <- sm_data_soils %>% ## drop uncessary columns
   select(-c('a','b','c'))
 
 dim(sm_data_soils)
+
+
+# Drop times that have duplicate measurements  ----------------------------
+count_measures <- sm_data_soils %>% 
+  group_by(DateTime_GMT, Plotcode) %>% count() %>% 
+  filter(n > 1) %>% 
+  left_join(sm_data_soils) 
+  #distinct()
+
+data_without_double_coundts <- sm_data_soils %>% filter(!FID %in% count_measures$FID)
+
+count_measures_distinct <- count_measures %>% select(-c(FID)) %>% distinct() %>% group_by(DateTime_GMT, Plotcode) %>% count() %>% 
+  filter(n>1) %>%
+  left_join(sm_data_soils) %>% 
+  filter(T1 < 40 & T1 > -10 & T2 < 40 & T2 > -10 & T3 < 55 & T3 > -15)
+graph <- ggplot(filter(count_measures_distinct)) + #, Plotcode == "CA_ST_fs88")) + 
+  geom_point(aes(DateTime_GMT, T1, color = Plotcode), size = 0.5, shape = 16) + 
+  geom_point(aes(DateTime_GMT, T2, color = Plotcode), size = 0.5, shape = 17) + 
+  geom_point(aes(DateTime_GMT, T3, color = Plotcode), size = 0.5, shape = 18) + 
+  #scale_x_datetime(date_labels = "%B") +
+  theme_bw() + 
+  ylab("Temperature")
+graph
+
+
+#following these explorations I have decided all of this data is absolutely useless and we are better off without it 
+
+sm_data_soils <- data_without_double_coundts
 ## Drop columns that do not need to be in the dataset 
 
 simple_data_part <- sm_data_soils %>% 
-  select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point", "SM_Count", "TMS_SoilType", "vol_sm"))
+  select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point"))
 
 
 write.csv(simple_data_part, "Microclimate_filtered_Vol_Sm_Nov-22-20.csv")
