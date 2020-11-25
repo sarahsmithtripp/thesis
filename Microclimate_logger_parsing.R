@@ -2,7 +2,6 @@
 
 ## SST 
 ## NOvember 2020
-## From couch because ill 
 library(tidyverse)
 library(zoo)
 
