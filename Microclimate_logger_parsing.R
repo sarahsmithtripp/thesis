@@ -3,6 +3,7 @@
 ## SST 
 ## NOvember 2020
 library(tidyverse)
+
 library(zoo)
 
 setwd("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements")
@@ -31,7 +32,7 @@ T2 <- filter_me(microclimate_veg_data, 'T2')
 microclimate_veg_data_long <- microclimate_veg_data %>% 
   filter(sensor == 'T3') %>%
   rename(T3 = temperature) %>% 
-  select(-sensor) %>% 
+  dplyr::select(-c(sensor)) %>% 
   left_join(T1, by = c('Logger', 'DateTime_GMT')) %>% 
   left_join(T2, by = c('Logger', 'DateTime_GMT')) %>% 
   mutate(lid_lost = paste0(Comments.Oct,"_",Comments.june.july)) 
@@ -247,12 +248,12 @@ simple_data_plots <- simple_data %>%
 ## Read in soil data
 
 soil_data_TMS <- readxl::read_excel("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/Sample_Sites_Soil.xlsx", sheet = "Sheet1")
-soil_data_TMS <- soil_data_TMS[,c('TMS_SoilType','logger...28')]
-names(soil_data_TMS) <- c('TMS_SoilType','Logger.x') ## rename soil data to join
+soil_data_TMS <- soil_data_TMS[,c("%silt", "%sand", "%clay",'logger...28')]
+names(soil_data_TMS) <- c('%silt', "%sand", "%clay",'Logger.x') ## rename soil data to join
 
 sm_logger.x.fickle <- simple_data_plots %>% filter(Logger.x !='NA') %>% filter(Logger.x > 94203290) %>% filter(DateTime_GMT > "2020-07-03")
 sm_logger.x <- simple_data_plots %>% filter(Logger.x != 'NA')  %>% filter(Logger.x <= 94203290) %>%  full_join(sm_logger.x.fickle) %>% left_join(soil_data_TMS)
-names(soil_data_TMS) <- c('TMS_SoilType', 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
+names(soil_data_TMS) <- c('%clay',"%silt", "%sand", 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
 sm_logger.y <- simple_data_plots %>% filter(Logger.y !='NA') %>% left_join(soil_data_TMS)
 sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
 
@@ -261,14 +262,14 @@ sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
 source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=F)
 
 
-sm_data_soils <- left_join(sm_data_soil, soils_eq_df) 
+sm_data_soils <- left_join(sm_data_soil, TMS_userdef_Gavin_Lake) 
 dim(sm_data_soils) 
 sm_data_soils[,c('a','b','c')] <- apply(sm_data_soils[,c('a','b','c')], 2, as.numeric)
 
 ### calibrate using provided TMS codes 
 sm_data_soils$vol_sm <-  sm_data_soils$a*(sm_data_soils$SM_Count)^2 + sm_data_soils$b*(sm_data_soils$SM_Count) - sm_data_soils$c
 sm_data_soils <- sm_data_soils %>% ## drop uncessary columns 
-  select(-c('a','b','c'))
+  dplyr::select(-c('a','b','c', '%clay','%silt','%sand','%total'))
 
 dim(sm_data_soils)
 
@@ -282,7 +283,7 @@ count_measures <- sm_data_soils %>%
 
 data_without_double_coundts <- sm_data_soils %>% filter(!FID %in% count_measures$FID)
 
-count_measures_distinct <- count_measures %>% select(-c(FID)) %>% distinct() %>% group_by(DateTime_GMT, Plotcode) %>% count() %>% 
+count_measures_distinct <- count_measures %>% dplyr::select(-c(FID)) %>% distinct() %>% group_by(DateTime_GMT, Plotcode) %>% count() %>% 
   filter(n>1) %>%
   left_join(sm_data_soils) %>% 
   filter(T1 < 40 & T1 > -10 & T2 < 40 & T2 > -10 & T3 < 55 & T3 > -15)
@@ -302,7 +303,7 @@ sm_data_soils <- data_without_double_coundts
 ## Drop columns that do not need to be in the dataset 
 
 simple_data_part <- sm_data_soils %>% 
-  select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point"))
+  dplyr::select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point"))
 
 
-write.csv(simple_data_part, "Microclimate_filtered_Vol_Sm_Nov-22-20.csv")
+write.csv(simple_data_part, "Microclimate_TMS_UserSoils_Nov-25-20.csv")
