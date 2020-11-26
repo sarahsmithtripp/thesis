@@ -5,7 +5,7 @@ library(tidyverse)
 
 
 
-climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_filtered_Vol_Sm_Nov-22-20.csv", header = T)
+climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_TMS_UserSoils_Nov-25-20.csv", header = T)
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% 
   mutate(DateTime = as.Date(DateTime_GMT))
@@ -17,7 +17,7 @@ meta_data <- meta_data[2:nrow(meta_data), ]
 
 ### Add day and night to data frame 
 #install.packages("StreamMetabolism")
-library(StreamMetabolism)
+#library(StreamMetabolism)
 #define latitude and longitude of the field site
 lat <- meta_data$Latitude[1]
 long <- meta_data$Longitude[1]
@@ -37,10 +37,11 @@ soil_moisture_expl <- climate_data %>%
          DateTime_GMT = lubridate::ymd_hms(DateTime_GMT),
          Hour =lubridate::hour(DateTime_GMT), 
          DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour))) %>%
-  group_by(DateTime_GMT, TMS_SoilType) %>% 
+ left_join(meta_data[,c('Plotcode', 'perc_silt_r1m')]) %>% 
+  group_by(DateTime_GMT, perc_silt_r1m) %>% 
   mutate(sm_mean_soiltype = mean(vol_sm, na.rm = T), 
-         sm_mean_ct = mean(SM_Count, na.rm = T)) %>%
-  group_by(DateTime_Hour, Plotcode) %>% 
+         sm_mean_ct = mean(SM_Count, na.rm = T)) # %>%
+   #group_by(DateTime_Hour, Plotcode) %>% 
   summarize(
     day_night = day_night, 
     sm_mean_plot_d = mean(vol_sm, na.rm = T), 
@@ -165,32 +166,44 @@ T2_day <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 
 T3_night <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T3', day = 'night')
 T2_night <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T2', day = 'night')
 T1_night <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T1', day = 'night')
-title <- ggdraw() + draw_label("MPG declines with displacement and horsepower", fontface='bold')
-library(cowplot)
-pdf(file = "D:/Data/SmithTripp/Gavin_Lake/Figures/Temperature_TimeSeries.pdf")
-##T3
-cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Daytime"), T3_day[[1]], T3_day[[2]], T3_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Daytime"), T3_day[[4]], T3_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Nighttime"), T3_night[[1]], T3_night[[2]], T3_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Nighttime"), T3_night[[4]], T3_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
 
-##T2 
-cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Daytime"), T2_day[[1]], T2_day[[2]], T2_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Daytime"), T2_day[[4]], T2_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Nighttime"), T2_night[[1]], T2_night[[2]], T2_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Nighttime"), T2_night[[4]], T2_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
 
-##T1
-cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Daytime"), T1_day[[1]], T1_day[[2]], T1_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Daytime"), T1_day[[4]], T1_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Nighttime"), T1_night[[1]], T1_night[[2]], T1_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Nighttime"), T1_night[[4]], T1_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-
-dev.off()
-# ggplot(soil_moisture_expl, aes(group = as.factor(TMS_SoilType))) + 
-#          geom_line(aes(DateTime_GMT, sm_mean_ct, color = as.factor(TMS_SoilType)))
-#   #geom_point(aes(DateTime_GMT, sm_mean_plot_d), size = 0.1, alpha = 0.4) + 
-#   #facet_wrap(~TMS_SoilType)
+# library(cowplot)
+# pdf(file = "D:/Data/SmithTripp/Gavin_Lake/Figures/Temperature_TimeSeries.pdf")
+# ##T3
+# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Daytime"), T3_day[[1]], T3_day[[2]], T3_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Daytime"), T3_day[[4]], T3_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Nighttime"), T3_night[[1]], T3_night[[2]], T3_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Nighttime"), T3_night[[4]], T3_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
+# 
+# ##T2 
+# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Daytime"), T2_day[[1]], T2_day[[2]], T2_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Daytime"), T2_day[[4]], T2_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Nighttime"), T2_night[[1]], T2_night[[2]], T2_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Nighttime"), T2_night[[4]], T2_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
+# 
+# ##T1
+# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Daytime"), T1_day[[1]], T1_day[[2]], T1_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Daytime"), T1_day[[4]], T1_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Nighttime"), T1_night[[1]], T1_night[[2]], T1_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
+# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Nighttime"), T1_night[[4]], T1_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
+# 
+# dev.off()
+sm_counts <- ggplot(soil_moisture_expl, aes(group = as.factor(perc_silt_r1m))) +
+         geom_line(aes(DateTime_GMT, sm_mean_ct, color = as.factor(perc_silt_r1m))) + 
+  theme_bw() + 
+  ylab('Soil Moisture Count') + xlab("") + 
+  labs(color = '% Silt') + theme(legend.position = "none")
+sm_moist <- ggplot(soil_moisture_expl, aes(group = as.factor(perc_silt_r1m))) +
+  geom_line(aes(DateTime_GMT, sm_mean_soiltype, color = as.factor(perc_silt_r1m))) + 
+  theme_bw() + 
+  ylab('Volumetric Soil Moisture (%)') + xlab("") + 
+  labs(color = '% Silt') 
+legend <- get_legend(sm_moist)
+sm_moist_no_leg <- sm_moist + theme(legend.position = "none")
+left_side_side <- plot_grid(ggdraw() + draw_label("Mean Values by Soil Type (all % Silt Values are Unique Soils)"), sm_counts, sm_moist_no_leg, 
+                        nrow = 3, ncol = 1, rel_heights = c(0.15, 1,1))
+sm_moisture <- plot_grid(left_side_side, legend, rel_widths = c(1, 0.1))
 
 # develop microclimate summary data  --------------------------------------
 
