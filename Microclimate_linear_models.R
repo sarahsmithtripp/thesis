@@ -3,12 +3,21 @@
 ### reads in data submitted to soiltemp database that is clipped in the microclimate_logger_parsing - removing erroneous values 
 library(tidyverse)
 
+seq <- seq(from =1 , to = 10, by = 1)
+fs_seq <- paste0("fs", seq)
 
-
-climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_TMS_UserSoils_Nov-25-20.csv", header = T)
+climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_TMS_UserSoils_Nov-25-20.csv")
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% 
-  mutate(DateTime = as.Date(DateTime_GMT))
+  mutate(DateTime = as.Date(DateTime_GMT), 
+         Plotcode = as.factor(Plotcode), 
+         DateTime_GMT = lubridate::ymd_hms(DateTime_GMT),
+         Hour =lubridate::hour(DateTime_GMT), 
+         DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour)), 
+         Plot = factor(ifelse(grepl("CA_ST_fs10", .$Plotcode),'fs10', 
+                          substr(Plotcode, 7, 9)), levels = fs_seq))
+levels(climate_data$Plot)
+
 
 
 meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
@@ -17,7 +26,7 @@ meta_data <- meta_data[2:nrow(meta_data), ]
 
 ### Add day and night to data frame 
 #install.packages("StreamMetabolism")
-#library(StreamMetabolism)
+library(StreamMetabolism)
 #define latitude and longitude of the field site
 lat <- meta_data$Latitude[1]
 long <- meta_data$Longitude[1]
@@ -40,9 +49,9 @@ soil_moisture_expl <- climate_data %>%
  left_join(meta_data[,c('Plotcode', 'perc_silt_r1m')]) %>% 
   group_by(DateTime_GMT, perc_silt_r1m) %>% 
   mutate(sm_mean_soiltype = mean(vol_sm, na.rm = T), 
-         sm_mean_ct = mean(SM_Count, na.rm = T)) # %>%
-   #group_by(DateTime_Hour, Plotcode) %>% 
-  summarize(
+         sm_mean_ct = mean(SM_Count, na.rm = T))  %>%
+   group_by(DateTime_Hour, Plotcode) %>% 
+  summarize(Plot  = Plot,
     day_night = day_night, 
     sm_mean_plot_d = mean(vol_sm, na.rm = T), 
          T1_mean_h = mean(T1, na.rm = T), 
@@ -57,7 +66,7 @@ soil_moisture_expl  <- distinct(soil_moisture_expl)
 #first define some colors 
 library(RColorBrewer)
 # Define the number of colors you want
-nb.cols <- 20
+nb.cols <- 90
 mycolors_day <- colorRampPalette(brewer.pal(10, "Spectral"))(nb.cols)
 mycolors_night <- colorRampPalette(brewer.pal(10, "BrBG"))(nb.cols)
 n <- seq(0, 90, by = 20)
@@ -189,6 +198,49 @@ T1_night <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var 
 # cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Nighttime"), T1_night[[4]], T1_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
 # 
 # dev.off()
+
+## Different style temperature plots 
+T1_plots <- ggplot(soil_moisture_expl) +
+  geom_point(
+    aes(DateTime_Hour, T1_mean_h, color = Plotcode),
+    size = 0.2,
+    shape = 16, alpha = 0.4 
+  ) +
+  scale_x_datetime(date_labels = "%B") +
+  theme_bw() +
+  ylab("Temperature T1") + 
+  scale_color_manual(values = mycolors_day) + 
+  xlab(NULL) + facet_wrap(~Plot)
+T2_plots <- ggplot(soil_moisture_expl) +
+  geom_point(aes(DateTime_Hour, T2_mean_h, color = Plotcode),
+    size = 0.2,
+    shape = 16, alpha = 0.4) +
+  scale_x_datetime(date_labels = "%B") +
+  theme_bw() +
+  ylab("Temperature T1") + 
+  scale_color_manual(values = mycolors_day) + 
+  xlab(NULL) + facet_wrap(~Plot)
+T3_plots <-  ggplot(soil_moisture_expl) +
+  geom_point(aes(DateTime_Hour, T3_mean_h, color = Plotcode),
+             size = 0.2,
+             shape = 16, alpha = 0.4) +
+  scale_x_datetime(date_labels = "%B") +
+  theme_bw() +
+  ylab("Temperature T1") + 
+  scale_color_manual(values = mycolors_day) + 
+  xlab(NULL) + facet_wrap(~Plot)
+
+# plot NA values in dataset 
+Na_values <- climate_data %>% select(-c("Time", "X", "DateTime_GMT", "DateTime_Hour", "Hour")) %>% pivot_longer(starts_with("T"), names_to = "Sensor",  values_to = "Temperature") %>%
+  subset(is.na(Temperature)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9,11)) 
+Nan_graph <- ggplot(Na_values, aes(DateTime, plot_num, group = Plot)) + 
+  geom_point(aes(color = Plot)) + facet_wrap(~Sensor) +theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
+  ggtitle("Values Excluded From Dataset")
+
+ggsave(Nan_graph, filename  = "D:/Data/SmithTripp/Gavin_Lake/Figures/Dropped_Values.jpeg")
+# soil Moisture plots  ----------------------------------------------------
+
+
 sm_counts <- ggplot(soil_moisture_expl, aes(group = as.factor(perc_silt_r1m))) +
          geom_line(aes(DateTime_GMT, sm_mean_ct, color = as.factor(perc_silt_r1m))) + 
   theme_bw() + 
@@ -237,54 +289,15 @@ plotter <- function(data,det_variable, resp_variable, transform, label) {
     data_det_vars <- data[, c(det_variable_list)]
     data_det_vars <- apply(data_det_vars, 2, as.numeric) + 1
     data_det_vars_log <- apply(data_det_vars, 2, log)
-    data_transform <- data.frame(data[, c(resp_variable, 'Plotcode', 'month')], data_det_vars_log)
-    data_transform <- distinct(data_transform)
-    data_1 <- data_transform[,c(resp_variable, det_variable_list[1], 'month')] 
-    names(data_1) <- c('y','x', 'month')
-    data_2 <- data_transform[,c(resp_variable, det_variable_list[2], 'month')] 
-    names(data_2) <- c('y','x', 'month')
-    data_3 <- data_transform[,c(resp_variable, det_variable_list[3], 'month')] 
-    
-    names(data_3) <- c('y','x', 'month')
-    data_4 <- data_transform[,c(resp_variable, det_variable_list[4], 'month')] 
-    names(data_4) <- c('y','x', 'month')
-    data_5 <- data_transform[,c(resp_variable, det_variable_list[5], 'month')] 
-    names(data_5) <- c('y','x', 'month')
-    range_r2m <- ggplot(data_1, aes(x,y, group = month)) +
-      geom_point(aes(color = as.factor(month))) + 
-      xlab(det_variable_list[1]) + 
-      ylab(resp_variable) + 
-      theme_bw() +
-      theme(legend.position = "none")
-    
-    range_r5m <- ggplot(data_2, aes(x, y, group = month)) +
-      geom_point(aes(color = as.factor(month))) + 
-      xlab(det_variable_list[2]) + 
-      ylab(resp_variable) + 
-      theme_bw() +
-      theme(legend.position = "none")
-    range_r10m <- ggplot(data_3, aes(x,y, group = month)) +
-      geom_point(aes(color = as.factor(month))) +
-      xlab(det_variable_list[3]) + 
-      ylab(resp_variable) + 
-      theme_bw() +
-      theme(legend.position = "none")
-    range_r15m <- ggplot(data_4, aes(x,y, group = month)) +
-      geom_point(aes(color = as.factor(month)))  + 
-      xlab(det_variable_list[4]) + 
-      ylab(resp_variable) + 
-      theme_bw() +
-      theme(legend.position = "none")
-    range_r20m <- ggplot(data_5, aes(x,y, group = month)) +
-      xlab(det_variable_list[5]) + 
-      ylab(resp_variable) + 
-      geom_point(aes(color = as.factor(month))) + 
-      theme_bw() 
-    
-    legend <- get_legend(range_r20m)
-    labeller <- ggdraw() + draw_label(label)
-    plots <- plot_grid(range_r2m, range_r5m, range_r10m, range_r15m, range_r20m + theme(legend.position = "none"), legend)
-    out_plots <- plot_grid(labeller, plots, ncol = 1, nrow=2, rel_heights= c(0.1, 1))
+    data_transform <- data.frame(data[, c(resp_variable, 'Plotcode', 'month', 'plot')], data_det_vars_log)
+    levels(data_transform$plot) <- fs_seq
+    data_transform_gather <- data_transform %>% distinct() %>% pivot_longer(cols = det_variable_list, names_to = "Radius", values_to = "Value")
+    names(data_transform_gather )[names(data_transform_gather) == resp_variable ] <- 'Y'
+    graph <- ggplot(data_transform_gather, aes(Value, Y, group = as.factor(month))) + 
+      geom_point(aes(color = as.factor(plot))) + 
+      xlab(det_variable) + ylab(resp_variable) + ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+      theme_bw() + 
+      facet_wrap(~Radius)
   } 
   
   else if(transform == F) { 
@@ -297,53 +310,6 @@ plotter <- function(data,det_variable, resp_variable, transform, label) {
       geom_point(aes(color = as.factor(month))) + 
       theme_bw() + 
       facet_wrap(~Canopy_Radius)
-    # #data_vars <- distinct(data_transform)
-    # data_1a <- data_vars[,c(resp_variable, det_variable_list[1], 'month')] 
-    # names(data_1a) <- c('y','x', 'month')
-    # data_2a <- data_vars[,c(resp_variable, det_variable_list[2], 'month')] 
-    # names(data_2a) <- c('y','x', 'month')
-    # data_3a <- data_vars[,c(resp_variable, det_variable_list[3], 'month')] 
-    # 
-    # names(data_3a) <- c('y','x', 'month')
-    # data_4a <- data_vars[,c(resp_variable, det_variable_list[4], 'month')] 
-    # names(data_4a) <- c('y','x', 'month')
-    # data_5a <- data_vars[,c(resp_variable, det_variable_list[5], 'month')] 
-    # names(data_5a) <- c('y','x', 'month')
-    # range_r2m <- ggplot(data_1a, aes(x,y, group = month)) +
-    #   geom_point(aes(color = as.factor(month))) + 
-    #   xlab(det_variable_list[1]) + 
-    #   ylab(resp_variable) + 
-    #   theme_bw() +
-    #   theme(legend.position = "none")
-    # 
-    # range_r5m <- ggplot(data_2a, aes(x, y, group = month)) +
-    #   geom_point(aes(color = as.factor(month))) + 
-    #   xlab(det_variable_list[2]) + 
-    #   ylab(resp_variable) + 
-    #   theme_bw() +
-    #   theme(legend.position = "none")
-    # range_r10m <- ggplot(data_3a, aes(x,y, group = month)) +
-    #   geom_point(aes(color = as.factor(month))) +
-    #   xlab(det_variable_list[3]) + 
-    #   ylab(resp_variable) + 
-    #   theme_bw() +
-    #   theme(legend.position = "none")
-    # range_r15m <- ggplot(data_4a, aes(x,y, group = month)) +
-    #   geom_point(aes(color = as.factor(month)))  + 
-    #   xlab(det_variable_list[4]) + 
-    #   ylab(resp_variable) + 
-    #   theme_bw() +
-    #   theme(legend.position = "none")
-    # range_r20m <- ggplot(data_5a, aes(x,y, group = month)) +
-    #   xlab(det_variable_list[5]) + 
-    #   ylab(resp_variable) + 
-    #   geom_point(aes(color = as.factor(month))) + 
-    #   theme_bw() 
-    #   
-    # legend <- get_legend(range_r20m)
-    # labeller <- ggdraw() + draw_label(label)
-    # plots <- plot_grid(range_r2m, range_r5m, range_r10m, range_r15m, range_r20m + theme(legend.position = "none"), legend)
-    # out_plots <- plot_grid(labeller, plots, ncol = 1, nrow=2, rel_heights= c(0.1, 1))
     }
     
 }
@@ -362,31 +328,44 @@ min_T_graphs
 
 dev.off()
 
-model_graphs <- function(data, model, y) {
-  data$yhat.0 <- fitted(model, level = 0 ) #population averaged estimates
-  data$yhat.1 <- fitted(model, level = 1) #plot level estimates
-  data$resid.0 <- resid(model, level = 0) #estimate residuals 
-  data$resid.1 <- resid(model, level = 1) # estimate the models final residuals (i.e. actual error in the model) 
+library(cowplot)
+model_graphs <- function(data, nlme_model, lmer4_model, y) {
+  lme4_plot <- ggpredict(lmer4_model, terms = c("x", "month", "plot"), type = "re") %>% 
+    plot() +
+    labs(x = "Canopy Height (m)", y = "Range T1  (deg C)", title = "Effect of Canopy Height on Range in Temperatures") + 
+    theme_minimal()
+  data$yhat.0 <- fitted(nlme_model, level = 0 ) #population averaged estimates
+  data$yhat.1 <- fitted(nlme_model, level = 1) #plot level estimates
+  data$resid.0 <- resid(nlme_model, level = 0) #estimate residuals 
+  data$resid.1 <- resid(nlme_model, level = 1) # estimate the models final residuals (i.e. actual error in the model) 
   # get diagnostic plots
   lev1_residuals <- ggplot(data, aes(yhat.0, resid.0)) + geom_point() + ggtitle("Residual Plot, Population level") + theme_bw()
   fit_plot <- ggplot(data, aes(yhat.1, resid.1)) + geom_point() + ggtitle("Residual plot, individual point level") +theme_bw()
   qnorm <- ggplot(data, aes(sample = resid.1)) +stat_qq() + ggtitle("Normality Plot") + theme_bw()
-  hist <- ggplot(data, aes(resid.1)) + geom_density() + ggtitle("Error Distribution") +theme_bw()
+  hist <- ggplot(data, aes(resid.1)) + geom_density() + ggtitle("Error Distribution") +theme_bw() +ylim(0,1)
   stats_plots <- plot_grid(lev1_residuals, fit_plot, qnorm, hist)
-  return(stats_plots)
+  plots_list <- list(stats_plots, lme4_plot)
+  return(plots_list)
 }
 
-package <- function(name, model, graphs) { 
-  packaged_data <- list(name, model, graphs, list(anova(model), summary(model)))
-  return(packaged_data)
+package <- function(name, nlme_mod, lme4_mod, graphs) { 
+  packaged_data_nlme <- list(name, nlme_mod, graphs[[1]], list(anova(nlme_mod), summary(nlme_mod)))
+  packaged_data_lme4 <- list(name, lme4_mod, graphs[[2]], list(anova(lme4_mod), summary(lme4_mod)))
+  packaged <- list(packaged_data_nlme, packaged_data_lme4)
+  return(packaged)
 }
-library(nlme)
+library(lme4)
+library(lmtest)
+library(ggeffects)
 lm_random_plots_graphs <- function(climate_modeling, resp_variable, det_variable) {
   det_variable_list <- names(data)[which(grepl(det_variable, names(data)))]
   data_det_vars <- data[, c(det_variable_list)]
   data_det_vars <- apply(data_det_vars, 2, as.numeric)
   
   data_vars <- data.frame(data[, c(resp_variable, 'Plotcode', 'month', 'plot')], data_det_vars)
+  data_vars$month <- as.factor(data_vars$month)
+  data_vars$plot <- as.factor(data_vars$plot)
+  levels(data_vars$plot) <- fs_seq
   #data_vars <- distinct(data_transform)
   data_1a <- data_vars[,c(resp_variable, det_variable_list[1], 'month', 'plot')] 
   names(data_1a) <- c('y','x', 'month', 'plot')
@@ -403,58 +382,73 @@ lm_random_plots_graphs <- function(climate_modeling, resp_variable, det_variable
   
   
    #write models
- lm1 <- lme(y~ x + month, data = data_1a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude, correlation = corAR1(form = 1|month))
- lm2 <- lme(y~x +as.factor(month), data = data_2a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
- lm3 <- lme(y~x +as.factor(month), data = data_3a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
- 
- lm4 <- lme(y~x +as.factor(month), data = data_4a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
- lm5 <- lme(y~x +as.factor(month), data = data_5a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
- 
+  lm1_nlme <- nlme::lme(y ~ x*plot , data_1a, random = ~1|month, method = "REML")
+  lm1_lme4 <- lmer(y~x*plot + (1|month), data = data_1a, REML = T, na.action = na.exclude)
+  # glm1 <- nlme::gls(y~x + plot, data = data_1a)
+  # wghts1 <- nlme::varIdent(~1 | month)
+  # M.glm1 <- nlme::gls(y ~ x  + plot, weights = wghts1, data = data_1a)
+  lm2_nlme <- lmer(y~x + (1|month) + plot, data = data_2a, REML = T, na.action = na.exclude)
+  lm2_lme4 <- lmer(y~x*plot + (1|month), data = data_2a, REML = T, na.action = na.exclude)
+  
+  lm3_nlme <- lmer(y~x + (1|month) + plot, data = data_3a, REML = T, na.action = na.exclude)
+  lm3_lme4 <- lmer(y~x*plot + (1|month), data = data_3a, REML = T, na.action = na.exclude)
+  
+  lm4_nlme <- lmer(y~x + (1|month) + plot, data = data_4a, REML = T, na.action = na.exclude)
+  lm4_lme4 <- lmer(y~x*plot + (1|month), data = data_4a, REML = T, na.action = na.exclude)
+  
+  lm5_nlme <- lmer(y~x + (1|month) + plot, data = data_5a, REML = T, na.action = na.exclude)
+  lm5_lme4 <- lmer(y~x*plot + (1|month), data = data_5a, REML = T, na.action = na.exclude)
+  
  #get model graphs 
- graphs_lm1 <- model_graphs(data_1a, lm1, y = y)
- graphs_lm2 <- model_graphs(data_2a, lm2, y = y)
- graphs_lm3 <- model_graphs(data_3a, lm3, y = y)
- graphs_lm4 <- model_graphs(data_4a, lm4, y = y)
- graphs_lm5 <- model_graphs(data_5a, lm5, y = y)
+ graphs_lm1 <- model_graphs(data_1a, lm1_nlme, lm1_lme4, y = y)
+ graphs_lm2 <- model_graphs(data_2a, lm2_nlme, lm2_lme4, y = y)
+ graphs_lm3 <- model_graphs(data_3a, lm3_nlme, lm3_lme4, y = y)
+ graphs_lm4 <- model_graphs(data_4a, lm4_nlme, lm4_lme4, y = y)
+ graphs_lm5 <- model_graphs(data_5a, lm5_nlme, lm5_lme4,  y = y)
  
 
  
- range_1 <- package(det_variable_list[1], lm1, graphs_lm1)
- range_2 <- package(det_variable_list[2], lm2, graphs_lm2)
- range_3 <- package(det_variable_list[3], lm3, graphs_lm3)
- range_4 <- package(det_variable_list[4], lm4, graphs_lm4)
- range_5 <- package(det_variable_list[5], lm5, graphs_lm5)
+ range_1 <- package(det_variable_list[1], lm1_nlme, lm1_lme4, graphs_lm1)
+ range_2 <- package(det_variable_list[2], lm2_nlme, lm2_lme4, graphs_lm2)
+ range_3 <- package(det_variable_list[3], lm3_nlme, lm3_lme4, graphs_lm3)
+ range_4 <- package(det_variable_list[4], lm4_nlme, lm4_lme4, graphs_lm4)
+ range_5 <- package(det_variable_list[5], lm5_nlme, lm5_lme4, graphs_lm5)
  
  return(list(range_1, range_2, range_3, range_4, range_5))
 }
+
+range_T1_models <- lm_random_plots_graphs(climate_modeling = climate_modeling, resp_variable = "range_T1_m", det_variable = "DAP_Canopy_Height")
+
+
 
 lm_random_plots_graphs_log <- function(climate_modeling, resp_variable, det_variable) {
   det_variable_list <- names(data)[which(grepl(det_variable, names(data)))]
   data_det_vars <- data[, c(det_variable_list)]
   data_det_vars <- apply(data_det_vars, 2, as.numeric) + 1
   data_det_vars_log <- apply(data_det_vars, 2, log)
-  data_transform <- data.frame(data[, c(resp_variable, 'Plotcode', 'month')], data_det_vars_log)
+  data_transform <- data.frame(data[, c(resp_variable, 'Plotcode', 'month','plot')], data_det_vars_log)
   data_transform <- distinct(data_transform)
-  data_1a <- data_transform[,c(resp_variable, det_variable_list[1], 'month')] 
-  names(data_1a) <- c('y','x', 'month')
-  data_2a <- data_transform[,c(resp_variable, det_variable_list[2], 'month')] 
-  names(data_2a) <- c('y','x', 'month')
-  data_3a <- data_transform[,c(resp_variable, det_variable_list[3], 'month')] 
+  data_transform$month <- as.factor(data_vars$month)
+  data_transform$plot <- as.factor(data_vars$plot)
+  data_1a <- data_transform[,c(resp_variable, det_variable_list[1], 'month', 'plot')] 
+  names(data_1a) <- c('y','x', 'month', 'plot')
+  data_2a <- data_transform[,c(resp_variable, det_variable_list[2], 'month', 'plot')] 
+  names(data_2a) <- c('y','x', 'month', 'plot')
+  data_3a <- data_transform[,c(resp_variable, det_variable_list[3], 'month', 'plot')] 
   
-  names(data_3a) <- c('y','x', 'month')
-  data_4a <- data_transform[,c(resp_variable, det_variable_list[4], 'month')] 
-  names(data_4a) <- c('y','x', 'month')
-  data_5a <- data_transform[,c(resp_variable, det_variable_list[5], 'month')] 
-  names(data_5a) <- c('y','x', 'month')
+  names(data_3a) <- c('y','x', 'month', 'plot')
+  data_4a <- data_transform[,c(resp_variable, det_variable_list[4], 'month', 'plot')] 
+  names(data_4a) <- c('y','x', 'month', 'plot')
   
+  data_5a <- data_transform[,c(resp_variable, det_variable_list[5], 'month', 'plot')] 
+  names(data_5a) <- c('y','x', 'month', 'plot')
   
   #write models
-  lm1 <- lme(y~x +as.factor(month), data = data_1a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
-  lm2 <- lme(y~x +as.factor(month), data = data_2a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
-  lm3 <- lme(y~x +as.factor(month), data = data_3a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
-  
-  lm4 <- lme(y~x +as.factor(month), data = data_4a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
-  lm5 <- lme(y~x +as.factor(month), data = data_5a, method = "REML", random = ~ 1 |as.factor(plot), na.action = na.exclude)
+  lm1 <- lmer(y~x + (1|month) + plot, data = data_1a, REML = T, na.action = na.exclude)
+  lm2 <- lmer(y~x + (1|month) + plot, data = data_2a, REML = T, na.action = na.exclude)
+  lm3 <- lmer(y~x + (1|month) + plot, data = data_3a, REML = T, na.action = na.exclude)
+  lm4 <- lmer(y~x + (1|month) + plot, data = data_4a, REML = T, na.action = na.exclude)
+  lm5 <- lmer(y~x + (1|month) + plot, data = data_5a, REML = T, na.action = na.exclude)
   
   #get model graphs 
   graphs_lm1 <- model_graphs(data_1a, lm1, y = y)
@@ -475,6 +469,6 @@ lm_random_plots_graphs_log <- function(climate_modeling, resp_variable, det_vari
 }
 
 
-range_T_mods <- lm_random_plots_graphs(climate_modeling, resp_variable = 'range_T1_m', det_variable = 'DAP_Canopy_Height')
-range_T_mods_log <- lm_random_plots_graphs(climate_modeling, resp_variable = 'range_T1_m', det_variable = 'DAP_Canopy_Height')
+range_T_mods_log <- lm_random_plots_graphs_log(climate_modeling, resp_variable = 'range_T1_m', det_variable = 'DAP_Canopy_Height')
+  lm_random_plots_graphs(climate_modeling, resp_variable = 'range_T1_m', det_variable = 'DAP_Canopy_Height')
 
