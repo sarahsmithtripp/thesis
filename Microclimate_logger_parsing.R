@@ -303,7 +303,10 @@ sm_data_soils <- data_without_double_coundts
 ## Drop columns that do not need to be in the dataset 
 
 simple_data_part <- sm_data_soils %>% 
-  dplyr::select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point"))
-
+  dplyr::select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point", "FID", "Logger.x"))
 
 write.csv(simple_data_part, "Microclimate_TMS_UserSoils_Nov-25-20.csv")
+
+soil_temp <- simple_data_part %>%dplyr::select(-c("Comments.june.july"))
+
+write.csv(soil_temp, "D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_data_27-Nov-2020.csv")
