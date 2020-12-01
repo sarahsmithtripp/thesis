@@ -24,7 +24,8 @@ microclimate_locations@data <-  microclimate_locations@data %>%
          Email = "ssmithtr@mail.ubc.ca", 
          Institute = "University of British Columbia", 
          EPSG = 4326,
-         Sensor_used = "TMS-4", 
+         Logger_make = "TOMST", 
+         Logger_model = "TMS-4",
          Sensor_accuracy = 0.5, 
          Sensor_notes = "", 
          Start_date_month = 5, 
@@ -70,7 +71,7 @@ summary_veg_data <- veg_soil_data %>%
 names_ordered <- c('Plotcode',	'Dataset_manager',	'Email',	'Institute',
                    'Latitude', 'Longitude', 'Elevation', 
                    'EPSG', 'GPS_accuracy','plot_point', 
-                   'Sensor_used',	'Sensor_accuracy',	'Sensor_notes',	'Start_date_year',	'Start_date_month',
+                   'Logger_make', "Logger_model",'Sensor_accuracy',	'Sensor_notes',	'Start_date_year',	'Start_date_month',
                    'Start_date_day','End_date_year',	'End_date_month',	'End_date_day',	'Temporal_resolution',
                    'UTC_Local',	'Species_composition','Species_trait',	'Plot_size', 'Habitat_type',
                    'Habitat_sub_type', 'Disturbance_type', 'Disturbance_sev_r50m_NBR', 'Data_open_access',	'Meta_data_open_access') 
@@ -144,4 +145,4 @@ GPS_accuracy <- microclimate_locations_df_3_GPS %>%
 microclimate_locations_df_3[is.na(microclimate_locations_df_3$GPS_accuracy), c("GPS_accuracy")] <- c(GPS_accuracy$GPS_acc)
 
 
-write.csv(microclimate_locations_df_3, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/SoilTemp_MetaData.csv")
+#write.csv(microclimate_locations_df_3, "D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData_27-Nov-2020.csv")
