@@ -2,7 +2,7 @@
 
 ### reads in data submitted to soiltemp database that is clipped in the microclimate_logger_parsing - removing erroneous values 
 library(tidyverse)
-
+library(cowplot)
 seq <- seq(from =1 , to = 10, by = 1)
 fs_seq <- paste0("fs", seq)
 
@@ -40,222 +40,6 @@ climate_data_sunrise_join <- climate_data %>%
 
 climate_data <- climate_data_sunrise_join[, c(names(climate_data), 'day_night')]
 
-# add a section to look at the variation between different soil type --------
-soil_moisture_expl <- climate_data %>% 
-  mutate(Plotcode = as.factor(Plotcode), 
-         DateTime_GMT = lubridate::ymd_hms(DateTime_GMT),
-         Hour =lubridate::hour(DateTime_GMT), 
-         DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour))) %>%
- left_join(meta_data[,c('Plotcode', 'perc_silt_r1m')]) %>% 
-  group_by(DateTime_GMT, perc_silt_r1m) %>% 
-  mutate(sm_mean_soiltype = mean(vol_sm, na.rm = T), 
-         sm_mean_ct = mean(SM_Count, na.rm = T))  %>%
-   group_by(DateTime_Hour, Plotcode) %>% 
-  summarize(Plot  = Plot,
-    day_night = day_night, 
-    sm_mean_plot_d = mean(vol_sm, na.rm = T), 
-         T1_mean_h = mean(T1, na.rm = T), 
-         T2_mean_h = mean(T2, na.rm = T), 
-         T3_mean_h = mean(T3, na.rm = T)) 
-soil_moisture_expl  <- distinct(soil_moisture_expl)
-
-
-
-# Graph the Temporal length of the Data -----------------------------------
-
-#first define some colors 
-library(RColorBrewer)
-# Define the number of colors you want
-nb.cols <- 90
-mycolors_day <- colorRampPalette(brewer.pal(10, "Spectral"))(nb.cols)
-mycolors_night <- colorRampPalette(brewer.pal(10, "BrBG"))(nb.cols)
-n <- seq(0, 90, by = 20)
-graph_temps <- function(num, soil_moisture_expl, var, day) {
-  subset_data_q <- levels(soil_moisture_expl$Plotcode)[num:(num + 19)]
-  subset_data <-
-    filter(soil_moisture_expl, Plotcode %in% subset_data_q)
-  if (day == 'day') {
-    subset_data <- filter(subset_data, day_night == 'day')
-    if (var == 'T1') {
-      graph <- ggplot(subset_data) +
-        geom_point(
-          aes(DateTime_Hour, T1_mean_h, color = Plotcode),
-          size = 0.2,
-          shape = 16, alpha = 0.4 
-        ) +
-        scale_x_datetime(date_labels = "%B") +
-        theme_bw() +
-        ylab("Temperature T1") + 
-        scale_color_manual(values = mycolors_day) + 
-        xlab(NULL)
-      graph
-      #cowplot::save_plot(graph)
-    }
-    else if (var == 'T2') {
-      graph <- ggplot(subset_data) +
-        geom_point(
-          aes(DateTime_Hour, T2_mean_h, color = Plotcode),
-          size = 0.2,
-          shape = 17, alpha = 0.4
-        ) +
-        scale_x_datetime(date_labels = "%B") +
-        theme_bw() +
-        ylab("Temperature T2") + 
-        scale_color_manual(values = mycolors_day) + 
-        xlab(NULL)
-      graph
-    }
-    
-    else if (var == 'T3') {
-      graph <- ggplot(subset_data) +
-        geom_point(
-          aes(DateTime_Hour, T3_mean_h, color = Plotcode),
-          size = 0.2,
-          shape = 18, alpha = 0.4 
-        ) +
-        scale_x_datetime(date_labels = "%B") +
-        theme_bw() +
-        ylab("Temperature T3") + 
-        scale_color_manual(values = mycolors_day) + 
-        xlab(NULL)
-      graph
-    }
-  }
-  else if (day == 'night') {
-    subset_data <- filter(subset_data, day_night == 'night')
-    if (var == 'T1') {
-      graph <- ggplot(subset_data) +
-        geom_point(
-          aes(DateTime_Hour, T1_mean_h, color = Plotcode),
-          size = 0.2,
-          shape = 16, alpha = 0.4
-        ) +
-        scale_x_datetime(date_labels = "%B") +
-        theme_bw() +
-        ylab("Temperature T1") + 
-        scale_color_manual(values = mycolors_night) + 
-        xlab(NULL)
-      graph
-      #cowplot::save_plot(graph)
-    }
-    else if (var == 'T2') {
-      graph <- ggplot(subset_data) +
-        geom_point(
-          aes(DateTime_Hour, T2_mean_h, color = Plotcode),
-          size = 0.2,
-          shape = 17, alpha = 0.4
-        ) +
-        scale_x_datetime(date_labels = "%B") +
-        theme_bw() +
-        ylab("Temperature T2") + 
-        scale_color_manual(values = mycolors_night) + 
-        xlab(NULL)
-      graph
-    }
-    
-    else if (var == 'T3') {
-      graph <- ggplot(subset_data) +
-        geom_point(aes(DateTime_Hour, T3_mean_h, color = Plotcode), size = 0.2,shape = 18, alpha = 0.5) +
-        scale_x_datetime(date_labels = "%B") +
-        theme_bw() +
-        ylab("Temperature T3") + 
-        scale_color_manual(values = mycolors_night) + 
-        xlab(NULL)
-      graph
-    }
-  }
-  return(graph)
-}
-
-
-T3_day <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T3', day = 'day')
-T1_day <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T1', day = 'day')
-T2_day <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T2', day = 'day')
-
-T3_night <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T3', day = 'night')
-T2_night <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T2', day = 'night')
-T1_night <- lapply(n, graph_temps, soil_moisture_expl = soil_moisture_expl, var = 'T1', day = 'night')
-
-
-# library(cowplot)
-# pdf(file = "D:/Data/SmithTripp/Gavin_Lake/Figures/Temperature_TimeSeries.pdf")
-# ##T3
-# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Daytime"), T3_day[[1]], T3_day[[2]], T3_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Daytime"), T3_day[[4]], T3_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Nighttime"), T3_night[[1]], T3_night[[2]], T3_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T3 Hourly Values - Nighttime"), T3_night[[4]], T3_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-# 
-# ##T2 
-# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Daytime"), T2_day[[1]], T2_day[[2]], T2_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Daytime"), T2_day[[4]], T2_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Nighttime"), T2_night[[1]], T2_night[[2]], T2_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T2 Hourly Values - Nighttime"), T2_night[[4]], T2_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-# 
-# ##T1
-# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Daytime"), T1_day[[1]], T1_day[[2]], T1_day[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Daytime"), T1_day[[4]], T1_day[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Nighttime"), T1_night[[1]], T1_night[[2]], T1_night[[3]], nrow = 4, rel_heights=c(0.1, 1,1,1)) 
-# cowplot::plot_grid(ggdraw()+draw_label("T1 Hourly Values - Nighttime"), T1_night[[4]], T1_night[[5]],  nrow = 3, rel_heights=c(0.15, 1,1)) 
-# 
-# dev.off()
-
-## Different style temperature plots 
-T1_plots <- ggplot(soil_moisture_expl) +
-  geom_point(
-    aes(DateTime_Hour, T1_mean_h, color = Plotcode),
-    size = 0.2,
-    shape = 16, alpha = 0.4 
-  ) +
-  scale_x_datetime(date_labels = "%B") +
-  theme_bw() +
-  ylab("Temperature T1") + 
-  scale_color_manual(values = mycolors_day) + 
-  xlab(NULL) + facet_wrap(~Plot)
-T2_plots <- ggplot(soil_moisture_expl) +
-  geom_point(aes(DateTime_Hour, T2_mean_h, color = Plotcode),
-    size = 0.2,
-    shape = 16, alpha = 0.4) +
-  scale_x_datetime(date_labels = "%B") +
-  theme_bw() +
-  ylab("Temperature T1") + 
-  scale_color_manual(values = mycolors_day) + 
-  xlab(NULL) + facet_wrap(~Plot)
-T3_plots <-  ggplot(soil_moisture_expl) +
-  geom_point(aes(DateTime_Hour, T3_mean_h, color = Plotcode),
-             size = 0.2,
-             shape = 16, alpha = 0.4) +
-  scale_x_datetime(date_labels = "%B") +
-  theme_bw() +
-  ylab("Temperature T1") + 
-  scale_color_manual(values = mycolors_day) + 
-  xlab(NULL) + facet_wrap(~Plot)
-
-# plot NA values in dataset 
-Na_values <- climate_data %>% select(-c("Time", "X", "DateTime_GMT", "DateTime_Hour", "Hour")) %>% pivot_longer(starts_with("T"), names_to = "Sensor",  values_to = "Temperature") %>%
-  subset(is.na(Temperature)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9,11)) 
-Nan_graph <- ggplot(Na_values, aes(DateTime, plot_num, group = Plot)) + 
-  geom_point(aes(color = Plot)) + facet_wrap(~Sensor) +theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
-  ggtitle("Values Excluded From Dataset")
-
-ggsave(Nan_graph, filename  = "D:/Data/SmithTripp/Gavin_Lake/Figures/Dropped_Values.jpeg")
-# soil Moisture plots  ----------------------------------------------------
-
-
-sm_counts <- ggplot(soil_moisture_expl, aes(group = as.factor(perc_silt_r1m))) +
-         geom_line(aes(DateTime_GMT, sm_mean_ct, color = as.factor(perc_silt_r1m))) + 
-  theme_bw() + 
-  ylab('Soil Moisture Count') + xlab("") + 
-  labs(color = '% Silt') + theme(legend.position = "none")
-sm_moist <- ggplot(soil_moisture_expl, aes(group = as.factor(perc_silt_r1m))) +
-  geom_line(aes(DateTime_GMT, sm_mean_soiltype, color = as.factor(perc_silt_r1m))) + 
-  theme_bw() + 
-  ylab('Volumetric Soil Moisture (%)') + xlab("") + 
-  labs(color = '% Silt') 
-legend <- get_legend(sm_moist)
-sm_moist_no_leg <- sm_moist + theme(legend.position = "none")
-left_side_side <- plot_grid(ggdraw() + draw_label("Mean Values by Soil Type (all % Silt Values are Unique Soils)"), sm_counts, sm_moist_no_leg, 
-                        nrow = 3, ncol = 1, rel_heights = c(0.15, 1,1))
-sm_moisture <- plot_grid(left_side_side, legend, rel_widths = c(1, 0.1))
 
 # develop microclimate summary data  --------------------------------------
 
@@ -278,8 +62,6 @@ weird_data <- climate_modeling %>%
 
 ggplot(climate_modeling, aes(log(as.numeric(DAP_Canopy_Height_r2m)+1))) + 
   geom_density()
-
-
 
 
 #this function currently does NOT work 
@@ -357,7 +139,7 @@ package <- function(name, nlme_mod, lme4_mod, graphs) {
 library(lme4)
 library(lmtest)
 library(ggeffects)
-lm_random_plots_graphs <- function(climate_modeling, resp_variable, det_variable) {
+lm_random_plots_graphs <- function(data, resp_variable, det_variable) {
   det_variable_list <- names(data)[which(grepl(det_variable, names(data)))]
   data_det_vars <- data[, c(det_variable_list)]
   data_det_vars <- apply(data_det_vars, 2, as.numeric)
@@ -417,7 +199,11 @@ lm_random_plots_graphs <- function(climate_modeling, resp_variable, det_variable
  return(list(range_1, range_2, range_3, range_4, range_5))
 }
 
-range_T1_models <- lm_random_plots_graphs(climate_modeling = climate_modeling, resp_variable = "range_T1_m", det_variable = "DAP_Canopy_Height")
+range_T1_models <- lm_random_plots_graphs(data = climate_modeling, resp_variable = "range_T1_m", det_variable = "DAP_Canopy_Height")
+#structure of models 
+## range_t1_models [[1]] <- first level defines the radius model
+## range_modles[[1]][[1]] <- second level defines whether it is the nlme model or lmer model
+## order of the last list is as follows list(name, lme4_mod, graphs[[2]], list(anova(lme4_mod), summary(lme4_mod)))
 
 
 
@@ -472,3 +258,70 @@ lm_random_plots_graphs_log <- function(climate_modeling, resp_variable, det_vari
 range_T_mods_log <- lm_random_plots_graphs_log(climate_modeling, resp_variable = 'range_T1_m', det_variable = 'DAP_Canopy_Height')
   lm_random_plots_graphs(climate_modeling, resp_variable = 'range_T1_m', det_variable = 'DAP_Canopy_Height')
 
+
+  
+  ## Model selection 1 <- determine best resolution for modeling temperature range
+  ## start with canopy height because seems promising for fitting 
+  ## goal is a random slope by plot and a random intercept by month (unlikely that relationship would change month to month)
+  mixed.ranslope_r2m <- lmer(range_T1_m ~ DAP_Canopy_Height_r2m + (1 + DAP_Canopy_Height_r2m|plot) + (1|month), data = climate_modeling) #control=lmerControl(optimizer="bobyqa",                                                                                                                                         #optCtrl=list(maxfun=2e5))) 
+  mixed.ranslope_r5m <- lmer(range_T1_m ~ DAP_Canopy_Height_r5m + (1 + DAP_Canopy_Height_r5m|plot) + (1|month), data = climate_modeling) 
+  mixed.ranslope_r10m <- lmer(range_T1_m ~ DAP_Canopy_Height_r10m + (1 + DAP_Canopy_Height_r10m|plot) + (1|month), data = climate_modeling) 
+  mixed.ranslope_r15m <- lmer(range_T1_m ~ DAP_Canopy_Height_r15m + (1 + DAP_Canopy_Height_r15m|plot) + (1|month), data = climate_modeling) 
+  mixed.ranslope_r20m <- lmer(range_T1_m ~ DAP_Canopy_Height_r20m + (1 + DAP_Canopy_Height_r20m|plot) + (1|month), data = climate_modeling) 
+  
+  ### these models all get convergence warnings - I could put in an optimizer? 
+  
+  
+  AIC(mixed.ranslope_r2m, mixed.ranslope_r5m, mixed.ranslope_r10m, mixed.ranslope_r15m, mixed.ranslope_r20m)
+  anova(mixed.ranslope_r2m, mixed.ranslope_r5m, mixed.ranslope_r10m, mixed.ranslope_r15m, mixed.ranslope_r20m)
+  
+  
+  
+  
+  ## model with month as a random intercept is best 
+  #add predicted values to the dataset 
+  complete_cases <- function(query, d) {
+    cols <- c(grep(query, names(d)))
+    i <- complete.cases(d[,cols]) #subset to present values for query of interest
+    d <- d[i,]
+    return(d)
+  }
+  climate_models_complete <- complete_cases('range_T1_m', climate_modeling)
+  climate_models_complete$predicted_r15m_random <- predict(mixed.ranslope_r15m)
+  climate_models_complete$residual <- climate_models_complete$range_T1_m - climate_models_complete$predicted_r15m_random
+  ## check model assumptions 
+  fit_plot <- ggplot(climate_models_complete %>% filter(range_T1_m < 10), aes(predicted_r15m_random, residual)) + geom_point() + ggtitle("Residual plot, individual point level") +theme_bw()
+  qnorm <- ggplot(climate_models_complete, aes(sample = residual)) +stat_qq() + ggtitle("Normality Plot") + theme_bw()
+  hist <- ggplot(climate_models_complete, aes(residual)) + geom_density() + ggtitle("Error Distribution") +theme_bw() +ylim(0,1)
+  
+  ## model fails assumptions - logging variables to deal with heteroskacidity 
+  climate_models_complete$log_range_T1_m <- log(climate_models_complete$range_T1_m)
+  climate_models_complete$log_DAP_Canopy_Height_r15m <- log(climate_models_complete$DAP_Canopy_Cover_r15m)
+  
+  ## fit new model with logged variables 
+  mixed.ranslope_r15m_log <- lmer(log_range_T1_m ~ log_DAP_Canopy_Height_r15m + (1 + log_DAP_Canopy_Height_r15m|plot) + (1|month), data = climate_models_complete)
+  
+  #compare to a more parsimounious model 
+  ##Currently 15 meter seems like the best resolution - so we'll move on modeling from there 
+  mixed.ranslope_r15m_lognomonth <- lmer(log_range_T1_m ~ log_DAP_Canopy_Height_r15m + (1 + log_DAP_Canopy_Height_r15m|plot),data = climate_models_complete) 
+  mixed.ranslope_r15m_lognoplots <- lmer(log_range_T1_m ~ log_DAP_Canopy_Height_r15m + (1|month),data = climate_models_complete) 
+  
+  anova(mixed.ranslope_r15m_lognomonth, mixed.ranslope_r15m_log, mixed.ranslope_r15m_lognoplots)
+  ##random intercepts by month is a better fit 
+  
+  
+  climate_models_complete$log_predicted<- predict(mixed.ranslope_r15m_log)
+  climate_models_complete$log_residual<- climate_models_complete$range_T1_m - climate_models_complete$log_predicted_r15m_random
+  ##See if this fixes model assumptions 
+  fit_plot <- ggplot(climate_models_complete, aes(log_predicted_r15m_random, log_residual)) + geom_point() + ggtitle("Residual plot, individual point level") +theme_bw()
+  qnorm <- ggplot(climate_models_complete, aes(sample = log_residual)) +stat_qq() + ggtitle("Normality Plot") + theme_bw()
+  hist <- ggplot(climate_models_complete, aes(log_residual)) + geom_density() + ggtitle("Error Distribution") +theme_bw() +ylim(0,1)
+  
+  
+  graph_mod <- ggplot(climate_models_complete) + 
+    geom_point(aes(log_DAP_Canopy_Height_r15m, log_range_T1_m)) + 
+    geom_line(aes(log_DAP_Canopy_Height_r15m, log_predicted, group = month, color = as.factor(month))) +
+    facet_wrap(~plot) +
+    labs(color = "month") +
+    ylim(0,15) +
+    theme_bw()
