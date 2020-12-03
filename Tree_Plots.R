@@ -73,7 +73,8 @@ trees_cart$Plot <- as.factor(trees_cart$Plot)
 length(unique(trees$Plot))
 
 summary_trees <- trees_cart %>% 
-  filter(Distance < 6.5) %>% # clip to the final area size 
+  filter(Distance < 6.5) %>%
+  #filter(!CC %in% c("I", "S", "s")) %>%# clip to the final area size 
   group_by(Plot) %>% 
   summarise( 
     fieldhtmax_trees = max(Adgjusted_height, na.rm = T), 
@@ -256,21 +257,22 @@ CHM_field_mean_livetrees <- merge(CHM_mean_height, summary_livetrees, by = "Plot
 CHM_field_2m <- merge(CHM_max_height_2m, summary_trees, by = "Plot")
 ## plot the derived data
 library(ggplot2)
-max_plot <- ggplot(CHM_max_field@data, aes(x=chm_2m_10cmres, y = fieldhtmax_trees, color = plot_num)) +
-  geom_point( size = 3) + 
+max_plot <- ggplot(CHM_max_field@data, aes(x=chm_2m_10cmres+1.2, y = fieldhtmax_trees)) +
+  geom_point( aes(color = plot_num), size = 3) + 
   ylab("Maximum measured height (m)") +
   xlab("Maximum DAP Pixel (m)")+
   xlim(0,35) + 
   ylim(0,35) + 
-  #stat_smooth(method = "lm", formula = y~ x) + 
+  stat_smooth(method = "lm", formula = y~ x) + 
   geom_abline(intercept = 0, slope=1) +
   ggthemes::scale_color_tableau(palette = "Classic Cyclic", na.value = T, drop = F) +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
   guides(color = F) + 
   cowplot::theme_cowplot() 
   #ggtitle("Max DAP vs. Field Ht (m)")
-mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres, y = fieldhtmean_trees, color = as.factor(plot_num))) +
-  geom_point( size = 3) +
+mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres+1.2, y = fieldhtmean_trees)) +
+  geom_point(aes(color = as.factor(plot_num)), size = 3) +
+  stat_smooth(method = "lm") +
   ylab("Mean measured height (m)") +
   xlab("Mean DAP Pixel (m)")+
   xlim(0,35) + 
@@ -288,14 +290,13 @@ mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres, y = fie
 #           base_width =7.5, base_height = 4)
 
 
-lm_tree_height_max <- lm(fieldhtmax_trees ~ chm_2m_10cmres , CHM_mean_field@data)
-
+lm_tree_height_max <- lm(fieldhtmax_trees ~ chm_2m_10cmres , CHM_max_field@data)
+plot(lm_tree_height_max)
 #Calculate RMSE because that is a measure of how well the model fits the data, rather than a simple measure of fit 
 RSS <- c(crossprod(lm_tree_height_max$residuals))
 MSE <- RSS / length(lm_tree_height_max$residuals)
 RMSE <- sqrt(MSE)
-lm_tree_height_mean <- lm(fieldhtmean_trees ~chm_2m_10cmres , CHM_max_field@data)
-mean_pl
+lm_tree_height_mean <- lm(fieldhtmean_trees ~chm_2m_10cmres , CHM_mean_field@data)
 
 summary(lm_tree_height_max)
 summary(lm_tree_height_mean)
