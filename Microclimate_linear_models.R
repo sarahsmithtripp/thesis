@@ -13,16 +13,14 @@ climate_data <- climate_data %>%
          Plotcode = as.factor(Plotcode), 
          DateTime_GMT = lubridate::ymd_hms(DateTime_GMT),
          Hour =lubridate::hour(DateTime_GMT), 
-         DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour)), 
-         Plot = factor(ifelse(grepl("CA_ST_fs10", .$Plotcode),'fs10', 
-                          substr(Plotcode, 7, 9)), levels = fs_seq))
+         DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour)))
 levels(climate_data$Plot)
 
 
 
 meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
-meta_data <- meta_data[2:nrow(meta_data), ]
 
+filter(meta_data, plot == "2")
 
 ### Add day and night to data frame 
 #install.packages("StreamMetabolism")
@@ -53,7 +51,6 @@ climate_modeling <- climate_data %>%
             max_T1_m = mean(max_T1_d, na.rm = T),
             min_T1_m = mean(min_T1_d, na.rm = T)) %>% 
   left_join(meta_data, by = 'Plotcode') %>% 
-  mutate(plot = as.factor(gsub('.{1}$', '', plot_point))) %>%
   filter(range_T1_m < 10)
 
 
@@ -87,11 +84,14 @@ plotter <- function(data,det_variable, resp_variable, transform, label) {
     data_det_vars <- apply(data_det_vars, 2, as.numeric)
     
     data_vars <- data.frame(data[, c(resp_variable, 'Plotcode', 'month')], data_det_vars)
+    names(data_vars) <- c('resp_variable', 'Plotcode', 'month', det_variable_list)
     data_vars_gather <- pivot_longer(data_vars, cols = det_variable_list, names_to ="Canopy_Radius", values_to = "Mean_Canopy_Height") 
-    graph <- ggplot(data_vars_gather, aes(Mean_Canopy_Height, range_T1_m, group = as.factor(month))) + 
+    graph <- ggplot(data_vars_gather, aes(Mean_Canopy_Height, resp_variable, group = as.factor(month))) + 
       geom_point(aes(color = as.factor(month))) + 
-      theme_bw() + 
-      facet_wrap(~Canopy_Radius)
+      ylab(paste(resp_variable)) +
+      facet_wrap(~Canopy_Radius) +
+      theme_bw()
+      
     }
     
 }
@@ -325,3 +325,119 @@ range_T_mods_log <- lm_random_plots_graphs_log(climate_modeling, resp_variable =
     labs(color = "month") +
     ylim(0,15) +
     theme_bw()
+  
+  
+
+# Committee meeting graphs  -----------------------------------------------
+graph_data <- climate_modeling %>% ungroup %>% dplyr::select(ends_with('m'), 'plot', 'Plotcode') %>% dplyr::select(-ends_with("_m")) %>% dplyr::distinct()
+graph_data$plot <- as.factor(graph_data$plot)
+  levels(graph_data$plot) <- seq(1,10, by = 1)
+canopy_height <- ggplot(graph_data, aes(as.factor(plot), 
+                                        as.numeric(DAP_Canopy_Height_r15m), 
+                                        group = as.factor(plot), color = as.factor(plot))) + 
+    geom_boxplot(aes(fill = as.factor(plot)),alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+    geom_point(alpha = 0.7, sive = 1.2, position = 'jitter')+
+    ylab("Mean Canopy Height (m) 15 m radius") + 
+    labs(color = "Plot") +
+    xlab("Plot")+
+    theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+    ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+    ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+    cowplot:: theme_cowplot()
+
+canopy_cover <- ggplot(graph_data, aes(plot, as.numeric(DAP_Canopy_Cover_r15m), group = plot, color = plot)) + 
+  geom_boxplot(aes(fill = plot), alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(alpha = 0.7, sive = 1.2, position = 'jitter')+
+  ylab("Mean Canopy Cover (m) 15 m radius") + 
+  labs(color = "Plot") +
+  xlab("Plot")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot()
+  
+slope <- ggplot(graph_data, aes(plot, as.numeric(slope.r15m), group = plot, color = plot)) + 
+  geom_boxplot(aes(fill = plot),alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(alpha = 0.7, sive = 1.2, position = 'jitter', outlier.color = NA)+
+  ylab("Slope (m) 15 m radius") + 
+  labs(color = "Plot") +
+  xlab("Plot")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot()
+
+elevation <- graph_data %>%
+  group_by(plot) %>%
+  mutate(elevation_r15m_n = as.numeric(elevation_r15m),
+         elev_filtered = case_when(elevation_r15m_n - quantile(elevation_r15m_n)[4] > 1.5*IQR(elevation_r15m_n) ~ NA_real_,
+                                  quantile(elevation_r15m_n)[2] - elevation_r15m_n > 1.5*IQR(elevation_r15m_n) ~ NA_real_,
+                                  TRUE ~ elevation_r15m_n)) %>% ggplot( aes(group = plot, color = plot)) + 
+  geom_boxplot(aes(plot, elevation_r15m_n, fill = plot),alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(aes(plot, elevation_r15m_n), alpha = 0.7, sive = 1.2, position = 'jitter')+
+  ylab("Elevation (m) 15 m radius") + 
+  labs(color = "Plot") +
+  xlab("Plot")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot()
+
+
+plot_grid(elevation, slope, ncol = 1, nrow = 2)
+plot_grid(canopy_cover, canopy_height, ncol = 1)
+
+
+
+# Checking for co-linearity among model predictors  -----------------------
+
+canopy_elev <- ggplot(graph_data, aes(as.numeric(DAP_Canopy_Height_r15m),as.numeric(elevation_r15m))) + 
+  geom_point(aes(color = plot)) +
+  stat_smooth(method = "lm") +
+  
+  ylab("Elevation (m)") + 
+  labs(color = "Plot") +
+  xlab("Mean Canopy Height (m)")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot()
+
+canopy_elev_lm <- lm(as.numeric(DAP_Canopy_Height_r15m)~ as.numeric(elevation_r15m), data = graph_data)
+par(mfrow = c(2,2))
+plot(canopy_elev_lm)
+summary(canopy_elev_lm)
+canopy_aspect <- ggplot(graph_data, aes(as.numeric(DAP_Canopy_Height_r15m),(as.numeric(aspect.r10m)*180/pi))) + 
+  geom_point(aes(color = plot)) +
+  stat_smooth(method = "lm") +
+  ylab("Aspect (°)") + 
+  labs(color = "Plot") +
+  xlab("Mean Canopy Height (m)")+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot() +
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)), legend.position = "none")
+
+
+aspect_eleve <- ggplot(graph_data, aes(as.numeric(elevation_r15m), as.numeric(aspect.r15m)*180/pi)) + 
+  geom_point(aes(color = plot)) +
+  stat_smooth(method = "lm") + 
+  ylab("Aspect (°)") + 
+  labs(color = "Plot") +
+  xlab("Elevation (m)")+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot() +
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)), legend.position = "none")
+aspect_elev_lm <- lm(as.numeric(aspect.r15m)~ as.numeric(elevation_r15m), data = graph_data)
+plot(aspect_elev_lm)
+summary(aspect_elev_lm)
+canopy_elev_leg <- get_legend(canopy_elev)
+plot_grid(canopy_elev + theme(legend.position = "none"), canopy_aspect, aspect_eleve, canopy_elev_leg, rel_widths = c(1,1,1,0.15), nrow = 1)
+
+
+meta_shape <- st_as_sf(meta_data, coords = c("Longitude", "Latitude"), crs = proj4string(tree_locations))
+
+plot(meta_shape, coldfasdfasdfsadfasdfsadfsadfsadfasdfta)
+
+

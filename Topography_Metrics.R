@@ -125,9 +125,10 @@ library(foreach)
              sp = F, stringAsFactors = F)
   terrain_values <- data.frame(plot_point = microclimate_locations$plot_point, 
                      elev, aspect, slope, TRI)
-  names(terrain_values) <- names 
+  names(terrain_values) <- names
   parallel::stopCluster(cl)
 
 
-write.csv(terrain_values, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/terrain_metrics.csv")
+#write.csv(terrain_values, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/terrain_metrics.csv")
+
 

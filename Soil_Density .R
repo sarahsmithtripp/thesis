@@ -58,7 +58,8 @@ all_plots <- all_plots %>%
                                            plot == 'OLDGUY' ~ 'oldguy', 
                                            plot == 'CC' ~ 'cc' ,
                                            plot == '-CONT' ~ 'cont',
-                                           plot == 'BT-W' ~ 'bt')))
+                                           plot == 'BT-W' ~ 'bt')), 
+         logger = logger...4)
 
 #bind poorly named plots to the main dataframe
 
@@ -148,6 +149,7 @@ bulk_density_graph <- ggplot(all_plots, aes(plot_num, `bulk density`, group = pl
   cowplot:: theme_cowplot()
 
 bulk_density_graph
+ggsave("Bulk Density.jpeg", bulk_density_graph, width = 7, height = 4)
 #vegetation_data 
 
 library(dplyr)
