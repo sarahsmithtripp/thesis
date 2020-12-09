@@ -12,7 +12,7 @@ meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_Me
 meta_data$plot <- as.factor(meta_data$plot)
 levels(meta_data$plot) <- seq(1,10, by = 1)
 
-climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_TMS_UserSoils_Nov-25-20.csv")
+climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_TMS_UserSoils_Dec-08-20.csv")
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% 
   mutate(DateTime = as.Date(DateTime_GMT), 
@@ -230,7 +230,7 @@ T3_plots <-  ggplot(soil_moisture_expl) +
   xlab(NULL) + facet_wrap(~Plot)
 
 # plot NA values in dataset 
-Na_values <- climate_data %>% select(-c("Time", "X", "DateTime_GMT", "DateTime_Hour", "Hour")) %>% pivot_longer(starts_with("T"), names_to = "Sensor",  values_to = "Temperature") %>%
+Na_values <- climate_data %>% dplyr::select(-c("Time", "X", "DateTime_GMT", "DateTime_Hour", "Hour")) %>% pivot_longer(starts_with("T"), names_to = "Sensor",  values_to = "Temperature") %>%
   subset(is.na(Temperature)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9,11)) 
 Nan_graph <- ggplot(Na_values, aes(DateTime, plot_num, group = plot)) + 
   geom_point(aes(color = plot)) + facet_wrap(~Sensor) +theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
@@ -249,7 +249,8 @@ soil_moisture_expl <- climate_data %>%
          DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour))) %>%
   left_join(meta_data[,c('Plotcode', 'perc_silt_r1m')]) %>% 
   group_by(DateTime_GMT, perc_silt_r1m) %>% 
-  mutate(sm_mean_soiltype = mean(vol_sm, na.rm = T), 
+  mutate(sm_val = vol_sm,
+      sm_mean_soiltype = mean(vol_sm, na.rm = T), 
          sm_mean_ct = mean(SM_Count, na.rm = T))
 
 sm_counts <- ggplot(soil_moisture_expl, aes(group = as.factor(perc_silt_r1m))) +
@@ -268,3 +269,12 @@ left_side_side <- plot_grid(ggdraw() + draw_label("Mean Values by Soil Type (all
                             nrow = 3, ncol = 1, rel_heights = c(0.15, 1,1))
 sm_moisture <- plot_grid(left_side_side, legend, rel_widths = c(1, 0.1))
 ggsave(sm_moisture, filename  = "D:/Data/SmithTripp/Gavin_Lake/Figures/soil_moisture_bysoiltype.jpeg")
+
+sm_moist_zoom <- ggplot(soil_moisture_expl %>% filter(DateTime_GMT > "2020-08-15" & DateTime_GMT < "2020-08-22"), aes(group = as.factor(perc_silt_r1m))) +
+  geom_line(aes(DateTime_GMT, sm_mean_soiltype)) + 
+  geom_point(aes(DateTime_GMT, sm_val, color = as.factor(perc_silt_r1m)), size = 0.05, alpha = 0.1) +
+  facet_wrap(~as.factor(perc_silt_r1m))+
+  theme_bw() + 
+  ylab('Volumetric Soil Moisture (%)') + xlab("") + 
+  labs(color = '% Silt') 
+ggsave(sm_moist_zoom, filename  = "D:/Data/SmithTripp/Gavin_Lake/Figures/soil_moisture_August.jpeg")
