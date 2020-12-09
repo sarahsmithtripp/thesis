@@ -120,7 +120,7 @@ find_bad_days <- function(bad_logger, data){
   data_logger_sum <- data_logger %>% 
     group_by(day) %>% 
     summarize(soil_temp_sd = mean(soil_temp_sd))
-  rolled <- rollmean(zoo(data_logger_sum$soil_temp_sd, order.by = data_logger_sum$day), 7, aligng = c("right"), na.pad = T)
+  rolled <- rollmean(zoo(data_logger_sum$soil_temp_sd, order.by = data_logger_sum$day), 7, align = c("right"), na.pad = T)
   data_logger_sum$soil_tempmean_sd <- rolled
   plots <- ggplot(data_logger_sum, aes(day, soil_tempmean_sd)) + geom_line()
   return(list(data_logger_sum, plots, data_logger))
@@ -183,7 +183,7 @@ missing_data[,c('SM_Count', 'T1', 'T2', 'T3')] <- NA
 
 clean_logger_data <- rbind(missing_data, clean_logger_data)
 
-data_not_pulled <- data_lid_clean[-pulled_out, ]
+data_not_pulled <- data_lid_clean %>% filter(!FID %in% clean_logger_data$FID)
 
 
 ### bind together and write to a CSV because we have a clean mo-fo dataset!!!!!!!!!!!!!!
@@ -255,12 +255,6 @@ names(soil_data_TMS) <- c('%silt', "%sand", "%clay",'Logger.x') ## rename soil d
 logger_plotcode <- read.csv(file = "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/logger_plotcode.csv")
 soil_data_TMS <- soil_data_TMS %>% full_join(logger_plotcode) %>% dplyr::select(-contains("Logger"))
 sm_data_soil <- left_join(simple_data_plots, soil_data_TMS)
-#sm_logger.x.fickle <- simple_data_plots %>% filter(Logger.x !='NA') %>% filter(Logger.x > 94203290) %>% filter(DateTime_GMT > "2020-07-03")
-#sm_logger.x <- simple_data_plots %>% filter(Logger.x != 'NA')  %>% filter(Logger.x <= 94203290) %>%  full_join(sm_logger.x.fickle) %>% left_join(soil_data_TMS)
-#names(soil_data_TMS) <- c('%clay',"%silt"S, "%sand", 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
-#sm_logger.y <- simple_data_plots %>% left_join(soil_data_TMS)
-#sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
-#sm_data_soil <- sm_logger.y
 
 ### run script to get model coefficients 
 source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=F)
@@ -306,7 +300,7 @@ Nan_sm <- data_without_double_coundts %>% subset(is.na(vol_sm)) %>% distinct() %
 Nan_sm_graph <- ggplot(Nan_sm, aes(DateTime_GMT, plot_num, group = plot_num)) + 
   geom_point() + theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
   ggtitle("Values Excluded From Dataset")
-
+Nan_sm_graph
 sm_data_soils <- data_without_double_coundts
 ## Drop columns that do not need to be in the dataset 
 
