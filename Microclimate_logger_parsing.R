@@ -243,7 +243,8 @@ simple_data_plots <- simple_data %>%
          #Time = lubridate::hms(DateTime_GMT), 
          Year = lubridate::year(DateTime_GMT),
         Time = get_time(DateTime_GMT)) %>% 
-  filter(DateTime_GMT >= "2020-05-13")
+  filter(DateTime_GMT >= "2020-05-13") %>% 
+  dplyr::select(-contains("Logger"))
 
 ## Read in soil data
 
@@ -251,12 +252,15 @@ soil_data_TMS <- readxl::read_excel("D:/Data/SmithTripp/Gavin_Lake/Field_SiteDat
 soil_data_TMS <- soil_data_TMS[,c("%silt", "%sand", "%clay",'logger...28')]
 names(soil_data_TMS) <- c('%silt', "%sand", "%clay",'Logger.x') ## rename soil data to join
 
-sm_logger.x.fickle <- simple_data_plots %>% filter(Logger.x !='NA') %>% filter(Logger.x > 94203290) %>% filter(DateTime_GMT > "2020-07-03")
-sm_logger.x <- simple_data_plots %>% filter(Logger.x != 'NA')  %>% filter(Logger.x <= 94203290) %>%  full_join(sm_logger.x.fickle) %>% left_join(soil_data_TMS)
-names(soil_data_TMS) <- c('%clay',"%silt", "%sand", 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
-sm_logger.y <- simple_data_plots %>% filter(Logger.y !='NA') %>% left_join(soil_data_TMS)
-sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
-
+logger_plotcode <- read.csv(file = "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/logger_plotcode.csv")
+soil_data_TMS <- soil_data_TMS %>% full_join(logger_plotcode) %>% dplyr::select(-contains("Logger"))
+sm_data_soil <- left_join(simple_data_plots, soil_data_TMS)
+#sm_logger.x.fickle <- simple_data_plots %>% filter(Logger.x !='NA') %>% filter(Logger.x > 94203290) %>% filter(DateTime_GMT > "2020-07-03")
+#sm_logger.x <- simple_data_plots %>% filter(Logger.x != 'NA')  %>% filter(Logger.x <= 94203290) %>%  full_join(sm_logger.x.fickle) %>% left_join(soil_data_TMS)
+#names(soil_data_TMS) <- c('%clay',"%silt"S, "%sand", 'Logger.y') ## rename soil data to join to the older and now replaced loggers 
+#sm_logger.y <- simple_data_plots %>% left_join(soil_data_TMS)
+#sm_data_soil <- rbind(sm_logger.x, sm_logger.y)
+#sm_data_soil <- sm_logger.y
 
 ### run script to get model coefficients 
 source('D:/Data/SmithTripp/RFiles/thesis/SoilMoisture_Calibration.R', echo=F)
@@ -298,14 +302,18 @@ graph
 
 
 #following these explorations I have decided all of this data is absolutely useless and we are better off without it 
+Nan_sm <- data_without_double_coundts %>% subset(is.na(vol_sm)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9, 11))
+Nan_sm_graph <- ggplot(Nan_sm, aes(DateTime_GMT, plot_num, group = plot_num)) + 
+  geom_point() + theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
+  ggtitle("Values Excluded From Dataset")
 
 sm_data_soils <- data_without_double_coundts
 ## Drop columns that do not need to be in the dataset 
 
 simple_data_part <- sm_data_soils %>% 
-  dplyr::select(-c("Original.Logger", "Logger.y", "Logger.y", "plot_point", "FID", "Logger.x"))
+  dplyr::select(-c("plot_point", "FID"))
 
-write.csv(simple_data_part, "Microclimate_TMS_UserSoils_Nov-25-20.csv")
+write.csv(simple_data_part, "Microclimate_TMS_UserSoils_Dec-08-20.csv")
 
 soil_temp <- simple_data_part %>%dplyr::select(-c("Comments.june.july"))
 
