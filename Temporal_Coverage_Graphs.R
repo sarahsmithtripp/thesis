@@ -8,6 +8,10 @@ library(cowplot)
 seq <- seq(from =1 , to = 10, by = 1)
 fs_seq <- paste0("fs", seq)
 
+meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
+meta_data$plot <- as.factor(meta_data$plot)
+levels(meta_data$plot) <- seq(1,10, by = 1)
+
 climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_TMS_UserSoils_Nov-25-20.csv")
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% 
@@ -15,9 +19,9 @@ climate_data <- climate_data %>%
          Plotcode = as.factor(Plotcode), 
          DateTime_GMT = lubridate::ymd_hms(DateTime_GMT),
          Hour =lubridate::hour(DateTime_GMT), 
-         DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour)), 
-         plot = factor(ifelse(grepl("CA_ST_fs10", .$Plotcode),'fs10', 
-                              substr(Plotcode, 7, 9)), levels = fs_seq))
+         DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour))) %>%
+  left_join(meta_data[, c('Plotcode', 'plot')])
+  
 levels(climate_data$plot)
 
 ### Add day and night to data frame 
@@ -228,8 +232,12 @@ T3_plots <-  ggplot(soil_moisture_expl) +
 # plot NA values in dataset 
 Na_values <- climate_data %>% select(-c("Time", "X", "DateTime_GMT", "DateTime_Hour", "Hour")) %>% pivot_longer(starts_with("T"), names_to = "Sensor",  values_to = "Temperature") %>%
   subset(is.na(Temperature)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9,11)) 
-Nan_graph <- ggplot(Na_values, aes(DateTime, plot_num, group = Plot)) + 
-  geom_point(aes(color = Plot)) + facet_wrap(~Sensor) +theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
+Nan_graph <- ggplot(Na_values, aes(DateTime, plot_num, group = plot)) + 
+  geom_point(aes(color = plot)) + facet_wrap(~Sensor) +theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
+  ggtitle("Values Excluded From Dataset")
+Nan_sm <- climate_data %>% subset(is.na(vol_sm)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9, 11))
+Nan_sm_graph <- ggplot(Nan_sm, aes(DateTime, plot_num, group = plot)) + 
+  geom_point(aes(color = plot)) +theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
   ggtitle("Values Excluded From Dataset")
 
 ggsave(Nan_graph, filename  = "D:/Data/SmithTripp/Gavin_Lake/Figures/Dropped_Values.jpeg")
