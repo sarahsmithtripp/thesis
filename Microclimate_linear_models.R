@@ -14,7 +14,6 @@ climate_data <- climate_data %>%
          DateTime_GMT = lubridate::ymd_hms(DateTime_GMT),
          Hour =lubridate::hour(DateTime_GMT), 
          DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour)))
-levels(climate_data$Plot)
 
 
 
@@ -96,7 +95,7 @@ plotter <- function(data,det_variable, resp_variable, transform, label) {
     
 }
 
-Range_T_graphs <- plotter(climate_modeling, resp_variable = 'range_T1_m', det_variable =  "DAP_Canopy_Height", transform = T, label = "Mean Daily Range in Temperature by Month")
+Range_T_graphs <- plotter(climate_modeling, resp_variable = 'range_T1_m', det_variable =  "elevation", transform = F, label = "Mean Daily Range in Temperature by Month")
 max_T_graphs <- plotter(climate_modeling, resp_variable =  'max_T1_m', det_variable = "DAP_Canopy_Height", transform = F, label = "Mean Maximum Daily Temperature by Month")
 min_T_graphs <- plotter(climate_modeling, resp_variable = 'min_T1_m', det_variable = "DAP_Canopy_Height", transform = T, label = "Mean Minimum Daily Temperature by Month")
 
@@ -263,6 +262,10 @@ range_T_mods_log <- lm_random_plots_graphs_log(climate_modeling, resp_variable =
   ## Model selection 1 <- determine best resolution for modeling temperature range
   ## start with canopy height because seems promising for fitting 
   ## goal is a random slope by plot and a random intercept by month (unlikely that relationship would change month to month)
+  slope <- lm(range_T1_m ~ DAP_Canopy_Height_r15m, data = climate_modeling)
+lm.errvar1 <- lm(resid(slope) ~ log(DAP_Canopy_Height_r15m), data = climate_modeling)
+  wt1 <- (1/(exp(lm.errvar1$fitted.values))) # error variatances 
+  slope_wt <- lm(range_T1_m ~ DAP_Canopy_Height_r15m, data  = climate_modeling, weights = wt1)
   mixed.ranslope_r2m <- lmer(range_T1_m ~ DAP_Canopy_Height_r2m + (1 + DAP_Canopy_Height_r2m|plot) + (1|month), data = climate_modeling) #control=lmerControl(optimizer="bobyqa",                                                                                                                                         #optCtrl=list(maxfun=2e5))) 
   mixed.ranslope_r5m <- lmer(range_T1_m ~ DAP_Canopy_Height_r5m + (1 + DAP_Canopy_Height_r5m|plot) + (1|month), data = climate_modeling) 
   mixed.ranslope_r10m <- lmer(range_T1_m ~ DAP_Canopy_Height_r10m + (1 + DAP_Canopy_Height_r10m|plot) + (1|month), data = climate_modeling) 
@@ -382,6 +385,18 @@ elevation <- graph_data %>%
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   cowplot:: theme_cowplot()
+solar_rad <- ggplot(graph_data, aes(plot, Sol_rad.r.15.m, group = plot, color = plot)) + 
+  geom_boxplot(aes(fill = plot),alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(alpha = 0.7, sive = 1.2, position = 'jitter', outlier.color = NA)+
+  ylab("Solar Radiation (W/m^2)") + 
+  labs(color = "Plot") +
+  xlab("Plot")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot()
+
+  
 
 
 plot_grid(elevation, slope, ncol = 1, nrow = 2)
@@ -391,9 +406,9 @@ plot_grid(canopy_cover, canopy_height, ncol = 1)
 
 # Checking for co-linearity among model predictors  -----------------------
 
-canopy_elev <- ggplot(graph_data, aes(as.numeric(DAP_Canopy_Height_r15m),as.numeric(elevation_r15m))) + 
+canopy_elev <- ggplot(graph_data, aes(as.numeric(DAP_Canopy_Height_r15m),as.numeric(elevation_r15m), group = plot)) + 
   geom_point(aes(color = plot)) +
-  stat_smooth(method = "lm") +
+  stat_smooth(aes(color = plot), method = "lm", alpha  = 0.2) +
   
   ylab("Elevation (m)") + 
   labs(color = "Plot") +
@@ -403,13 +418,15 @@ canopy_elev <- ggplot(graph_data, aes(as.numeric(DAP_Canopy_Height_r15m),as.nume
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   cowplot:: theme_cowplot()
 
-canopy_elev_lm <- lm(as.numeric(DAP_Canopy_Height_r15m)~ as.numeric(elevation_r15m), data = graph_data)
+canopy_elev_lm <- lme(DAP_Canopy_Height_r15m ~ elevation_r15m, random = ~elevation_r15m|plot, data = graph_data, method = "REML")
+canopy_elev_control <- lme(range_T1_m ~ DAP_Canopy_Height_r15m + elevation_r15m + DAP_Canopy_Height_r15m*elevation_r15m, data =climate_models_complete, random = ~ 1|plot, weights = varPower())
+canopy_DAP <- lme(range_T1_m ~ DAP_Canopy_Height_r15m, data =climate_models_complete, random = ~ 1|plot, weights = varPower())
 par(mfrow = c(2,2))
 plot(canopy_elev_lm)
 summary(canopy_elev_lm)
 canopy_aspect <- ggplot(graph_data, aes(as.numeric(DAP_Canopy_Height_r15m),(as.numeric(aspect.r10m)*180/pi))) + 
   geom_point(aes(color = plot)) +
-  stat_smooth(method = "lm") +
+  stat_smooth(method = "lm", alpha = 0.2) +
   ylab("Aspect (°)") + 
   labs(color = "Plot") +
   xlab("Mean Canopy Height (m)")+
@@ -418,10 +435,11 @@ canopy_aspect <- ggplot(graph_data, aes(as.numeric(DAP_Canopy_Height_r15m),(as.n
   cowplot:: theme_cowplot() +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)), legend.position = "none")
 
+canopy_aspect_lm <- lm(as.numeric(DAP_Canopy_Height_r15m)~ as.numeric(aspect.r15m), data = graph_data)
 
-aspect_eleve <- ggplot(graph_data, aes(as.numeric(elevation_r15m), as.numeric(aspect.r15m)*180/pi)) + 
+aspect_eleve <- ggplot(graph_data, aes(as.numeric(elevation_r15m), as.numeric(aspect.r15m)*180/pi, group = plot)) + 
   geom_point(aes(color = plot)) +
-  stat_smooth(method = "lm") + 
+  stat_smooth(aes(color = plot),method = "lm", alpha = 0.2) + 
   ylab("Aspect (°)") + 
   labs(color = "Plot") +
   xlab("Elevation (m)")+
@@ -429,15 +447,12 @@ aspect_eleve <- ggplot(graph_data, aes(as.numeric(elevation_r15m), as.numeric(as
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   cowplot:: theme_cowplot() +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)), legend.position = "none")
-aspect_elev_lm <- lm(as.numeric(aspect.r15m)~ as.numeric(elevation_r15m), data = graph_data)
+aspect_elev_lm <- lme(as.numeric(aspect.r15m)~ as.numeric(elevation_r15m), random = 
+                        ~elevation_r15m | plot,  data = graph_data)
 plot(aspect_elev_lm)
 summary(aspect_elev_lm)
 canopy_elev_leg <- get_legend(canopy_elev)
 plot_grid(canopy_elev + theme(legend.position = "none"), canopy_aspect, aspect_eleve, canopy_elev_leg, rel_widths = c(1,1,1,0.15), nrow = 1)
 
-
-meta_shape <- st_as_sf(meta_data, coords = c("Longitude", "Latitude"), crs = proj4string(tree_locations))
-
-plot(meta_shape, coldfasdfasdfsadfasdfsadfsadfsadfasdfta)
 
 

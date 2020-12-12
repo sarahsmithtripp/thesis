@@ -7,7 +7,7 @@
 ## Output a CSV of canopy height and canopy cover at different distances from
 ## microclimate locations
 
-
+library(tidyverse)
 
 # Out   ------------------------------------------
 query <- list.files(paste0("D:/Data/SmithTripp/Gavin_Lake/3D_models"), full.names = T)
@@ -41,10 +41,10 @@ raster::plot(microclimate_locations)
 #write sequence to name for numbers 
 seq <- seq(from =1 , to = 10, by = 1)
 fs_seq <- paste0("fs", seq)
+plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
 fire <- which(grepl("fire", names(plots@data)))
 plot <- which(grepl("plot", names(plots@data)))
 grabber_cols <- c(fire, plot)
-plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
 plots@data <- plots@data %>% 
   arrange(X_firemean) %>%
   mutate(
@@ -106,7 +106,8 @@ library(parallel)
 library(foreach)
 
 
-  names <- c("plot_point", paste0("DAP_Canopy_Height_r", radii, "m"), paste0("DAP_Canopy_Cover_r", radii, "m"))
+  names <- c("plot_point", paste0("DAP_Canopy_Height_r", radii, "m"), paste0("DAP_Canopy_Cover_r", radii, "m"),paste0("DAP_Canopy_Max_r", radii, "m"))
+             
   length <- length(microclimate_locations$plot_point)
 
   cl <- parallel::makeCluster(detectCores())
@@ -120,9 +121,13 @@ library(foreach)
     extract(canopy_cover_raster, microclimate_locations, 
             buffer = radii, fun = mean,
             sp = F, stringAsFactors = F)
+  chm_max <- foreach::foreach(radii = radii, .combine = cbind, .packages = 'raster') %dopar%
+    extract(canopy_cover_raster, microclimate_locations, 
+            buffer = radii, fun = max,
+            sp = F, stringAsFactors = F)
   data <- data.frame(plot_point = microclimate_locations$plot_point, 
                      chm,
-                     canopy_cover)
+                     canopy_cover, chm_max)
   names(data) <- names 
   parallel::stopCluster(cl)
 

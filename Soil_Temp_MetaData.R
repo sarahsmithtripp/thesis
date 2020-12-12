@@ -146,3 +146,10 @@ microclimate_locations_df_3[is.na(microclimate_locations_df_3$GPS_accuracy), c("
 
 
 #write.csv(microclimate_locations_df_3, "D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData_27-Nov-2020.csv")
+
+microclimate_meta <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv")
+#terrain_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/terrain_metrics.csv")
+#terrain_data <- terrain_data %>% dplyr::select("plot_point", starts_with("Sol"))
+canopy_max <- canopy_metrics %>% dplyr::select("plot_point", contains("Max"))
+microclimate_meta <- left_join(microclimate_meta, canopy_max)
+write.csv(microclimate_meta, "D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv")

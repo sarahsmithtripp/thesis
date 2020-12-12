@@ -283,8 +283,8 @@ data_without_double_coundts <- sm_data_soils %>% filter(!FID %in% count_measures
 
 count_measures_distinct <- count_measures %>% dplyr::select(-c(FID)) %>% distinct() %>% group_by(DateTime_GMT, Plotcode) %>% count() %>% 
   filter(n>1) %>%
-  left_join(sm_data_soils) %>% 
-  filter(T1 < 40 & T1 > -10 & T2 < 40 & T2 > -10 & T3 < 55 & T3 > -15)
+  left_join(sm_data_soils) #%>% 
+  #filter(T1 < 40 & T1 > -10 & T2 < 40 & T2 > -10 & T3 < 55 & T3 > -15)
 graph <- ggplot(filter(count_measures_distinct)) + #, Plotcode == "CA_ST_fs88")) + 
   geom_point(aes(DateTime_GMT, T1, color = Plotcode), size = 0.5, shape = 16) + 
   geom_point(aes(DateTime_GMT, T2, color = Plotcode), size = 0.5, shape = 17) + 
@@ -301,11 +301,11 @@ Nan_sm_graph <- ggplot(Nan_sm, aes(DateTime_GMT, plot_num, group = plot_num)) +
   geom_point() + theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
   ggtitle("Values Excluded From Dataset")
 Nan_sm_graph
-sm_data_soils <- data_without_double_coundts
+sm_data_soils <- sm_data_soils %>% dplyr::select(-c("FID")) %>% distinct()
 ## Drop columns that do not need to be in the dataset 
 
 simple_data_part <- sm_data_soils %>% 
-  dplyr::select(-c("plot_point", "FID"))
+  dplyr::select(-c("plot_point"))
 
 write.csv(simple_data_part, "Microclimate_TMS_UserSoils_Dec-08-20.csv")
 

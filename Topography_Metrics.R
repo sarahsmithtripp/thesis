@@ -15,7 +15,7 @@ setwd("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData")
 
 #raster with no values below 2m -> possibly more accurate to canopy height 
 dem_raster <- raster::raster("Clip_DEM.tif")
-
+solar_rad <- raster::raster("Solar_Rad_GrowingSeason_Total.tif")
 
 #Add in Microclimate locations 
 microclimate_locations <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/GPX_Waypoints/microclimate_location_oct-22-2020.shp")
@@ -100,7 +100,7 @@ library(parallel)
 library(foreach)
 
 ## process for topography metrics (taken out of function because not working)
-  names <- c("plot_point", paste0("elevation_r", radii, "m"), paste0("aspect r", radii, "m"), paste0("slope r", radii,"m"), paste("TRI r", radii, "m"))
+  names <- c("plot_point", paste0("elevation_r", radii, "m"), paste0("aspect r", radii, "m"), paste0("slope r", radii,"m"), paste("TRI r", radii, "m"), paste("Sol_rad r", radii, "m"))
   length <- length(microclimate_locations$plot_point)
   
   cl <- parallel::makeCluster(detectCores())
@@ -123,8 +123,13 @@ library(foreach)
      extract(terrain(dem_raster, opt = "TRI"), microclimate_locations, 
              buffer = radii, fun = mean,
              sp = F, stringAsFactors = F)
+  solar_rad <- foreach::foreach(radii = radii, .combine = cbind, .packages = 'raster') %dopar%
+     extract(solar_rad, microclimate_locations, 
+            buffer = radii, fun = mean,
+            sp = F, stringAsFactors = F)
   terrain_values <- data.frame(plot_point = microclimate_locations$plot_point, 
-                     elev, aspect, slope, TRI)
+                     elev, aspect, slope, TRI, solar_rad)
+ 
   names(terrain_values) <- names
   parallel::stopCluster(cl)
 
