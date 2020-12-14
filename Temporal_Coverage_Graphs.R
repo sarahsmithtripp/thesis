@@ -270,11 +270,14 @@ left_side_side <- plot_grid(ggdraw() + draw_label("Mean Values by Soil Type (all
 sm_moisture <- plot_grid(left_side_side, legend, rel_widths = c(1, 0.1))
 ggsave(sm_moisture, filename  = "D:/Data/SmithTripp/Gavin_Lake/Figures/soil_moisture_bysoiltype.jpeg")
 
-sm_moist_zoom <- ggplot(soil_moisture_expl %>% filter(DateTime_GMT > "2020-08-15" & DateTime_GMT < "2020-08-22"), aes(group = as.factor(perc_silt_r1m))) +
-  geom_line(aes(DateTime_GMT, sm_mean_soiltype)) + 
-  geom_point(aes(DateTime_GMT, sm_val, color = as.factor(perc_silt_r1m)), size = 0.05, alpha = 0.1) +
-  facet_wrap(~as.factor(perc_silt_r1m))+
+filtered <- soil_moisture_expl %>% filter(Plotcode == "CA_ST_fs21" & DateTime > '2020-08-01'
+                                          & DateTime < '2020-09-15')
+sm_moist_zoom <- ggplot(filtered) + 
+  #geom_line(aes(DateTime_GMT, sm_mean_soiltype)) + 
+  geom_point(aes(DateTime_GMT, sm_val, color = day_night, shape = day_night), size = 0.6, alpha = 0.6) +
+  #facet_wrap(~as.factor(perc_silt_r1m))+
+  scale_color_manual(values = c('orange', 'blue'))+
   theme_bw() + 
   ylab('Volumetric Soil Moisture (%)') + xlab("") + 
-  labs(color = '% Silt') 
+  labs(color = 'Time of Day') 
 ggsave(sm_moist_zoom, filename  = "D:/Data/SmithTripp/Gavin_Lake/Figures/soil_moisture_August.jpeg")
