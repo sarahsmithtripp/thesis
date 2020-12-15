@@ -229,6 +229,8 @@ T3_plots <-  ggplot(soil_moisture_expl) +
   scale_color_manual(values = mycolors_day) + 
   xlab(NULL) + facet_wrap(~Plot)
 
+T1_Mods_Graph <- ggplot(climate_data, aes(DateTime_GMT,T1, group = plot )) + geom_point(alpha = 0.1) + geom_smooth(formula = y ~ poly(x, 4))
+
 # plot NA values in dataset 
 Na_values <- climate_data %>% dplyr::select(-c("Time", "X", "DateTime_GMT", "DateTime_Hour", "Hour")) %>% pivot_longer(starts_with("T"), names_to = "Sensor",  values_to = "Temperature") %>%
   subset(is.na(Temperature)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9,11)) 
