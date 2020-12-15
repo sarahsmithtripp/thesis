@@ -110,31 +110,6 @@ min_T_graphs
 dev.off()
 
 library(cowplot)
-model_graphs <- function(data, nlme_model, lmer4_model, y) {
-  lme4_plot <- ggpredict(lmer4_model, terms = c("x", "month", "plot"), type = "re") %>% 
-    plot() +
-    labs(x = "Canopy Height (m)", y = "Range T1  (deg C)", title = "Effect of Canopy Height on Range in Temperatures") + 
-    theme_minimal()
-  data$yhat.0 <- fitted(nlme_model, level = 0 ) #population averaged estimates
-  data$yhat.1 <- fitted(nlme_model, level = 1) #plot level estimates
-  data$resid.0 <- resid(nlme_model, level = 0) #estimate residuals 
-  data$resid.1 <- resid(nlme_model, level = 1) # estimate the models final residuals (i.e. actual error in the model) 
-  # get diagnostic plots
-  lev1_residuals <- ggplot(data, aes(yhat.0, resid.0)) + geom_point() + ggtitle("Residual Plot, Population level") + theme_bw()
-  fit_plot <- ggplot(data, aes(yhat.1, resid.1)) + geom_point() + ggtitle("Residual plot, individual point level") +theme_bw()
-  qnorm <- ggplot(data, aes(sample = resid.1)) +stat_qq() + ggtitle("Normality Plot") + theme_bw()
-  hist <- ggplot(data, aes(resid.1)) + geom_density() + ggtitle("Error Distribution") +theme_bw() +ylim(0,1)
-  stats_plots <- plot_grid(lev1_residuals, fit_plot, qnorm, hist)
-  plots_list <- list(stats_plots, lme4_plot)
-  return(plots_list)
-}
-
-package <- function(name, nlme_mod, lme4_mod, graphs) { 
-  packaged_data_nlme <- list(name, nlme_mod, graphs[[1]], list(anova(nlme_mod), summary(nlme_mod)))
-  packaged_data_lme4 <- list(name, lme4_mod, graphs[[2]], list(anova(lme4_mod), summary(lme4_mod)))
-  packaged <- list(packaged_data_nlme, packaged_data_lme4)
-  return(packaged)
-}
 library(lme4)
 library(lmtest)
 library(ggeffects)
