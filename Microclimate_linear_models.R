@@ -38,9 +38,47 @@ climate_data_sunrise_join <- climate_data %>%
 climate_data <- climate_data_sunrise_join[, c(names(climate_data), 'day_night')]
 
 
+# Data Spread (for committee) ---------------------------------------------
+
+climate_sums <-climate_data %>% mutate(yday = lubridate::yday(DateTime_GMT)) %>% 
+  group_by(Plotcode, yday) %>% summarise(month = month, max_daily_T1 = max(T1), max_daily_T2 = max(T2),max_daily_T3 = max(T2)) %>% 
+  group_by(Plotcode, month) %>% summarise(mean_max_m_T1 = mean(max_daily_T1, na.rm = T),
+                                          mean_max_m_T2 = mean(max_daily_T2, na.rm = T),
+                                          mean_max_m_T3 = mean(max_daily_T3, na.rm = T)) %>% 
+  pivot_longer(cols = contains("mean_max"), names_to = "Temp_Sensor", values_to = "Mean_max_m") %>%
+  left_join(meta_data[,c("Plotcode", "plot")])
+quick_data_fix <- climate_data %>% 
+  filter(Plotcode %in% 
+           filter(climate_sums, Mean_max_m>30 & Temp_Sensor == "mean_max_m_T1")$Plotcode) %>% 
+  filter(DateTime_GMT > "2020-07-04")
+
+climate_data_fix <- climate_data %>%  filter(!Plotcode %in% 
+                                               c("CA_ST_fs78", "CA_ST_fs81", "CA_ST_fs85" ,"CA_ST_fs86", "CA_ST_fs96", "CA_ST_fs96")) %>% 
+  full_join(quick_data_fix)
+
+climate_sums <- climate_data_fix %>% mutate(yday = lubridate::yday(DateTime_GMT)) %>% 
+  group_by(Plotcode, yday) %>% summarise(month = month, max_daily_T1 = max(T1), max_daily_T2 = max(T2),max_daily_T3 = max(T2)) %>% 
+  group_by(Plotcode, month) %>% summarise("Soil (-8 cm)" = mean(max_daily_T1, na.rm = T),
+                                          "Surface (0 cm)" = mean(max_daily_T2, na.rm = T),
+                                          "Near-Surface (+15 cm)" = mean(max_daily_T3, na.rm = T)) %>% 
+  pivot_longer(cols = contains("cm"), names_to = "Temp_Sensor", values_to = "Mean_max_m") %>%
+  left_join(meta_data[,c("Plotcode", "plot")])
+Temperature_plots <- ggplot(climate_sums %>% filter(Temp_Sensor %in% c("Soil (-8 cm)", "Near-Surface (+15 cm)")), aes(month, Mean_max_m, group = month))+ 
+  geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(aes(color = as.factor(plot)), alpha = 0.4, position = 'jitter', size = 1)+
+  facet_wrap(~Temp_Sensor, ncol = 2) +
+  ylab("Average Daily Maximum Temperature °C") + 
+  labs(color = "Plot") +
+  xlab("Month")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
+  theme_bw(base_size = 15)
+
+
 # develop microclimate summary data  --------------------------------------
 
-climate_modeling <- climate_data %>% 
+climate_modeling <- climate_data_fix %>% 
   group_by(Plotcode, DateTime) %>% 
   mutate(range_T1_d = max(T1) - min(T1), 
          max_T1_d = max(T1), 
@@ -109,11 +147,84 @@ min_T_graphs
 
 dev.off()
 
+climate_modeling_annual <- climate_data_fix %>% 
+  pivot_longer(cols = c("T1", "T2", "T3"), names_to = 'sensor', values_to = 'Temp_C') %>% 
+  group_by(Plotcode, sensor, DateTime) %>% 
+  mutate(range_d = max(Temp_C) - min(Temp_C), 
+         min_d = min(Temp_C), 
+         max_d = max(Temp_C))%>% 
+  group_by(Plotcode, sensor) %>% 
+  summarise(range_T = mean(range_d, na.rm = T), 
+            max_T = mean(max_d, na.rm = T),
+            min_T = mean(min_d, na.rm = T), 
+            mean_T = mean(Temp_C, na.rm = T)) %>% 
+  left_join(meta_data, by = 'Plotcode')
+climate_modeling_Ht_long <-climate_modeling_annual %>% pivot_longer(cols = contains("Dap_Canopy_Height"), names_to ="Canopy_Radius", values_to = "Mean_Canopy_Height") 
+ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Height_r2m", "DAP_Canopy_Height_r15m")),
+       aes(Mean_Canopy_Height,mean_T)) + 
+  geom_point(aes(color = as.factor(plot))) + 
+  #geom_smooth(method = "lm", alpha = 0.2, color = "grey") +
+  ylab("Average Daily Maximum Temperature °C") + 
+  xlab("Average Canopy Height (m)") +
+  labs(color = "Plot") + 
+  facet_grid(Canopy_Radius ~ sensor) +   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +theme_bw(base_size = 15)
+
+
 library(cowplot)
 library(lme4)
 library(lmtest)
 library(ggeffects)
-  
+
+
+
+# Annual models  ----------------------------------------------------------
+soil_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + elevation_r15m + (1|plot), 
+                       data = filter(climate_modeling_annual, sensor == "T1"))
+plot(soil_annual_lm)
+
+#Nested model 1 - remove elevation because should be dealt with T1 
+soil_annual_lm_n1b <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + (1|plot), 
+                          data = filter(climate_modeling_annual, sensor == "T1"))
+#Nested model 2 - remove aspect
+soil_annual_lm_n1a <- lmer(mean_T ~ DAP_Canopy_Height_r15m + elevation_r15m+ (1|plot), 
+                          data = filter(climate_modeling_annual, sensor == "T1"))
+#remove all variables not Canopy Height 
+soil_annual_lm_n2 <- lmer(mean_T ~ DAP_Canopy_Height_r15m + (1|plot), 
+                          data = filter(climate_modeling_annual, sensor == "T1"))
+#remove random plot 
+soil_annual_lm_n3  <- lm(mean_T ~ DAP_Canopy_Height_r15m,
+                          data = filter(climate_modeling_annual, sensor == "T1"))
+anova(soil_annual_lm, soil_annual_lm_n1a, soil_annual_lm_n1b, soil_annual_lm_n2, soil_annual_lm_n3)
+
+#### plot annual soil temperature models 
+avg_values <-climate_modeling_annual %>% subset(!is.na(mean_T)) %>% group_by(plot) %>% summarize(aspect.r15m_avg = mean(aspect.r15m), 
+                                                                                    elevation.r15m_avg = mean(elevation_r15m), 
+                                                                                    DAP_Canopy_Ht_r15m = mean(DAP_Canopy_Height_r15m))
+##Create_Average Models for plotting 
+soil_temp_avgs <- climate_modeling_annual %>% filter(sensor == "T1") %>% left_join(avg_values) %>% subset(!is.na(mean_T))
+soil_annual_lm_plot <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_avg + elevation.r15m_avg + (1|plot), 
+                            data = soil_temp_avgs)
+soil_annual_lm_plot_elev <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m_avg + elevation_r15m + (1|plot), data = soil_temp_avgs)
+soil_annual_lm_plot_asp <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m + elevation.r15m_avg + (1|plot), data = soil_temp_avgs)
+
+soil_temp_avgs$DAP_Canopy_mod_r15m <- predict(soil_annual_lm_plot)
+soil_temp_avgs$Elev_mod_r15m <- predict(soil_annual_lm_plot_elev)
+soil_temp_avgs$Asp_mod_r15m <- predict(soil_annual_lm_plot_asp)
+
+# soil_temp_avgs <- soil_temp_avgs %>% pivot_longer(cols = contains('r15m'), names_to = c("Model"),
+#                                                   values_to = c("Pred")) %>%
+#   left_join(climate_modeling_annual %>% 
+#               select("Plotcode", "aspect.r15m", "elevation_r15m", "DAP_Canopy_Height_r15m") %>% 
+#               pivot_longer(cols = contains("r15m"),  names_to = "Variable", values_to = "Value") %>% distinct()) %>% distinct() %>% 
+#   mutate(var = case_when(Model == "DAP_Canopy_mod_r15m" ~ "Mean Canopy Height (m)", 
+#                          Model == "Elev_mod_r15m" ~ "Elevation (m)", 
+#                          Model == "Asp_mod_r15m" ~ "Aspect (Rad)"))
+
+## plot average soil temperature models 
+
+
   ## Model selection 1 <- determine best resolution for modeling temperature range
   ## start with canopy height because seems promising for fitting 
   ## goal is a random slope by plot and a random intercept by month (unlikely that relationship would change month to month)
