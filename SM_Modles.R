@@ -36,9 +36,12 @@ climate_data_sunrise_join <- climate_data %>%
 
 climate_data <- climate_data_sunrise_join[, c(names(climate_data), 'day_night')]
 
+
 meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
-meta_data$plot <- as.factor(meta_data$plot)
-levels(meta_data$plot) <- seq(1,10, by = 1)
+meta_data_asp <- dplyr::select(meta_data, contains("aspect"),'Plotcode')
+meta_data_asp[,1:5] <- apply(meta_data_asp[,1:5], 2, function(x) { cos((pi/4) * (x*180)/pi) } )
+names(meta_data_asp) <- c(paste0(names(meta_data_asp)[1:5], "_con"), "Plotcode")
+meta_data <- left_join(meta_data, meta_data_asp)
 
 ## colinearity between determinant variables 
 canopy_solar <- ggplot(meta_data, aes(Sol_rad.r.15.m, DAP_Canopy_Height_r15m, group = plot)) + 
@@ -101,126 +104,145 @@ ggplot(sm_model_long
 
 #annual  linear models  ----------------------------------------------------------
 library(lme4)
-SM_aspect <- SM_annual %>% subset(!is.na(mean_sm)) %>% group_by(plot) %>% summarize(aspect.r2m_avg = mean(aspect.r2m)) %>% dplyr::select(c("plot", "aspect.r2m_avg"))
+SM_aspect <- SM_annual %>% subset(!is.na(mean_sm)) %>% group_by(plot) %>% summarize(aspect.r2m_con_avg = mean(aspect.r2m_con)) %>% dplyr::select(c("plot", "aspect.r2m_con_avg"))
 #mean soil moisture 
-sm_canopy_height_elevat <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + aspect.r2m + (1|plot), data = SM_annual)
+sm_model <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + aspect.r2m_con + elevation_r2m + (1|plot), data = SM_annual)
 plot(sm_canopy_height_elevat)
-sm_canopy_height <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + (1|plot), data = SM_annual)
-sm_canopy_nonrandom <- lm(mean_sm ~ DAP_Canopy_Height_r2m, data = SM_annual)
-sm_canopy_aspect <- lm(mean_sm~aspect.r2m, data = SM_annual)
-summary(sm_canopy_height)
-anova(sm_canopy_height_elevat, sm_canopy_height, sm_canopy_nonrandom, sm_canopy_aspect)
-logLik(sm_canopy_height_elevat)
-logLik(sm_canopy_height)
-SM_range_mods <- SM_annual[complete.cases(SM_annual$mean_sm),]
-SM_range_mods <- left_join(SM_range_mods, SM_aspect)
-SM_pred <- SM_range_mods %>% select(c("mean_sm", "DAP_Canopy_Height_r2m", "aspect.r2m_avg", "plot")) %>% mutate(aspect.r2m = aspect.r2m_avg)
-sm_canopy_aspect_plot <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + (1|plot), data= SM_pred)
-SM_range_mods$lm.aspect.plot <- predict(lmer(mean_sm ~ aspect.r2m + (1|plot), data = SM_range_mods))
-SM_range_mods$lm.canopy.aspect <- predict(sm_canopy_height_elevat)
-SM_range_mods$lm.canopy.aspect.plt <- predict(sm_canopy_aspect_plot)
-SM_range_mods$lm.canopy.aspect.rsd.r2m <- SM_range_mods$mean_sm - SM_range_mods$lm.canopy.aspect
-confidence_intervals <- confint(sm_canopy_height_elevat, level = 0.95)
-pred <- cbind(SM_range_mods, merTools::predictInterval(sm_canopy_aspect_plot, which = "full"))
-cowplot::plot_grid(ggplot(pred, aes(DAP_Canopy_Height_r2m, mean_sm)) + 
-            geom_point(aes(color = plot)) +
-            geom_line(aes(DAP_Canopy_Height_r2m, lm.canopy.aspect.plt, group = plot, color = plot)) +
-            #geom_smooth( size =NA, span = 0.5,method = "rml", alpha  = 0.2) +
+sm_model_n1a <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + aspect.r2m_con + (1|plot), data = SM_annual)
+sm_model_n1b <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + elevation_r2m + (1|plot), data = SM_annual)
+sm_model_n2 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + (1|plot), data = SM_annual)
+sm_model_n3a <- lm(mean_sm ~ DAP_Canopy_Height_r2m, data = SM_annual)
+sm_model_n3b <- lm(mean_sm~aspect.r2m_con, data = SM_annual)
+sm_model_n4 <- lm(mean_sm ~aspect.r2m_con + DAP_Canopy_Height_r2m, data = SM_annual)
+anova(sm_model, sm_model_n1a, sm_model_n1b, sm_model_n2, sm_model_n3a, sm_model_n3b, sm_model_n4)
+
+#compare to poly 
+sm_model_log <- lmer(mean_sm ~ log(DAP_Canopy_Height_r2m) + (1|plot), data = SM_annual)
+sm_model_log_n1 <-  lm(mean_sm ~ log(DAP_Canopy_Height_r2m), data = SM_annual)
+anova(sm_model_n2, sm_model_log, sm_model_log_n1)
+SM_mods <- SM_annual[complete.cases(SM_annual$mean_sm),]
+#SM_range_mods <- left_join(SM_range_mods, SM_aspect)
+#SM_pred <- SM_range_mods %>% select(c("mean_sm", "DAP_Canopy_Height_r2m", "aspect.r2m_con_avg", "plot")) %>% mutate(aspect.r2m_con = aspect.r2m_con_avg)
+#sm_canopy_aspect_plot <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + (1|plot), data= SM_pred)
+SM_mods$lm_predict <- predict(sm_model_log_n1)
+
+confidence_intervals <- as.data.frame(confint(sm_model_log, level = 0.95)) 
+confidence_intervals$variable <- rownames(confidence_intervals)
+confidence_intervals <- confidence_intervals %>% pivot_longer(cols = c(`2.5 %`,`97.5 %`), names_to = "Interval", values_to = "Estimate")
+confidence_intervals_df <- confidence_intervals[which(grepl("DAP", confidence_intervals$variable)),]
+model_confidence_graph <- ggplot(confidence_intervals_df, aes(variable, Estimate)) + 
+  geom_point(aes(color = variable), size = 3) +geom_line(aes(color = variable), size = 2) +  ylab("Slope Estimate") + xlab("") + labs(color = "Model") +
+  scale_color_brewer(palette = "Dark2") + ylim(-0.1, 0.1) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 2) + theme_cowplot(font_size = 20) + theme(legend.position = "bottom",axis.title.x=element_blank(),
+                                                                                                    axis.text.x=element_blank(),
+                                                                                                    axis.ticks.x=element_blank())
+
+
+ggplot(SM_mods, aes(DAP_Canopy_Height_r2m, mean_sm)) + 
+            geom_point(aes(DAP_Canopy_Height_r2m, mean_sm, color = as.factor(plot))) +
+            #geom_line(aes(DAP_Canopy_Height_r2m, lm_predict, group = plot, color = plot)) +
+            stat_smooth(formula = y ~ log(x), span = 0.5,method = "lm", alpha  = 0.2) +
             #geom_abline(aes(intercept=`(Intercept)`, slope=DAP_Canopy_Height_r2m), as.data.frame(t(fixef(sm_canopy_aspect_plot)))) + 
-            geom_line(aes(DAP_Canopy_Height_r2m,lwr, color  = plot, group = plot), linetype = "dashed") +
-            geom_line(aes(DAP_Canopy_Height_r2m, upr, color = plot, group = plot), linetype = "dashed") + 
+            #geom_line(aes(DAP_Canopy_Height_r2m,lwr, color  = plot, group = plot), linetype = "dashed") +
+            #geom_line(aes(DAP_Canopy_Height_r2m, upr, color = plot, group = plot), linetype = "dashed") + 
             ylab("Mean Volumetric Soil Moisture (%)") + 
             labs(color = "Plot") +
             xlab("Mean Canopy Height (m)")+
             theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
             ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
             ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-            cowplot:: theme_cowplot() + theme(legend.position = "none"),
-          ggplot(SM_range_mods, aes(aspect.r2m, mean_sm)) + 
-            geom_point(aes(color = plot)) +
-            geom_line(aes(aspect.r2m, lm.aspect.plot, color = plot)) + 
-            #stat_smooth(method = "lm", alpha  = 0.2, color = "black") +
-            ylab("Mean Volumetric Soil Moisture (%)") + 
-            labs(color = "Plot") +
-            xlab("Aspect (rad)")+
-            theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
-            ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
-            ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-            cowplot:: theme_cowplot())
+            cowplot:: theme_cowplot(font_size = 20) + theme(legend.position = "none")
 
-##See if this fixes model assumptions 
-fit_plot <- ggplot(SM_range_mods, aes(lm.canopy.aspect, lm.canopy.aspect.rsd.r2m)) + geom_point() + ggtitle("Residual plot, individual point level") +theme_bw()
-qnorm <- ggplot(SM_range_mods, aes(sample = lm.canopy.aspect)) +stat_qq() + ggtitle("Normality Plot") + theme_bw()
-hist <- ggplot(SM_range_mods, aes(lm.canopy.aspect.rsd.r2m)) + geom_density() + ggtitle("Error Distribution") +theme_bw()
+#sd soil moisture 
+sm_model <- lmer(sd_sm ~ DAP_Canopy_Height_r2m + aspect.r2m_con + elevation_r2m + (1|plot), data = SM_annual)
+plot(sm_canopy_height_elevat)
+sm_model_n1a <- lmer(sd_sm ~ DAP_Canopy_Height_r2m + aspect.r2m_con + (1|plot), data = SM_annual)
+sm_model_n1b <- lmer(sd_sm ~ DAP_Canopy_Height_r2m + elevation_r2m + (1|plot), data = SM_annual)
+sm_model_n2 <- lmer(sd_sm ~ DAP_Canopy_Height_r2m + (1|plot), data = SM_annual)
+sm_model_n3a <- lm(sd_sm ~ DAP_Canopy_Height_r2m, data = SM_annual)
+sm_model_n3b <- lm(sd_sm~aspect.r2m_con, data = SM_annual)
+sm_model_n4 <- lm(sd_sm ~aspect.r2m_con + DAP_Canopy_Height_r2m, data = SM_annual)
+anova(sm_model, sm_model_n1a, sm_model_n1b, sm_model_n2, sm_model_n3a, sm_model_n3b, sm_model_n4)
 
-graph_mod <- ggplot(SM_range_mods, aes(DAP_Canopy_Height_r2m, mean_sm, group = plot)) + 
-  geom_point(aes(DAP_Canopy_Height_r15m, mean_sm)) +
-  #tat_smooth(method = "lm", alpha = 0.2) +
-  geom_line(aes(DAP_Canopy_Height_r2m, lm.canopy.ht, group = plot, color = plot)) +
-  #facet_wrap(~plot) +
-  labs(color = "month") +
-  theme_bw()
-confint(sm_canopy_height_elevat)
+#compare to poly 
+sm_model_log<-  lm(sd_sm ~ log(DAP_Canopy_Height_r2m), data = SM_annual)
+anova(sm_model_n3a, sm_model_log)
+SM_mods <- SM_annual[complete.cases(SM_annual$sd_sm),]
+#SM_range_mods <- left_join(SM_range_mods, SM_aspect)
+#SM_pred <- SM_range_mods %>% select(c("sd_sm", "DAP_Canopy_Height_r2m", "aspect.r2m_con_avg", "plot")) %>% mutate(aspect.r2m_con = aspect.r2m_con_avg)
+#sm_canopy_aspect_plot <- lmer(sd_sm ~ DAP_Canopy_Height_r2m + (1|plot), data= SM_pred)
+SM_mods$lm_predict <- predict(sm_model_n3a)
+
+confidence_intervals <- confint(sm_model_n3a, level = 0.95)
 
 
 # Daytime range in soil moisture  -----------------------------------------
 
-SM_annual_Daytime <- climate_data %>% filter(day_night == "day") %>% 
-  group_by(Plotcode, yday) %>% summarise(range_day = max(vol_sm, na.rm =T) - min(vol_sm, na.rm = T), group = "drop_last") %>% 
+SM_annual_Daytime <- climate_data %>% #filter(day_night == "day") %>% 
+  group_by(Plotcode, yday) %>% summarise(range_day = max(vol_sm) - min(vol_sm), group = "drop_last") %>% 
   summarise(mean_range = mean(range_day,na.rm = T)) %>% filter(mean_range != "-Inf") %>%
   left_join(meta_data)
 SM_annual_Nighttime <-climate_data %>% filter(day_night == "night") %>% 
-  group_by(Plotcode, yday) %>% summarise(range_day = max(vol_sm, na.rm =T) - min(vol_sm, na.rm = T), group = "drop_last") %>% 
+  group_by(Plotcode, yday) %>% summarise(range_day = max(vol_sm) - min(vol_sm), group = "drop_last") %>% 
   summarise(mean_range = mean(range_day,na.rm = T)) %>% filter(mean_range != "-Inf") %>%
   left_join(meta_data)
 
-sm_canopy_aspect_range_D <- lmer(mean_range ~ DAP_Canopy_Height_r2m + aspect.r2m + (1|plot), data = SM_annual_Daytime)
-sm_canopy_aspect_range_N <- lmer(mean_range ~ DAP_Canopy_Height_r2m + aspect.r2m + (1|plot), data = SM_annual_Nighttime)
+sm_canopy_aspect_range_D <- lmer(mean_range ~ DAP_Canopy_Height_r2m + aspect.r2m_con + (1|plot), data = SM_annual_Daytime)
+sm_canopy_aspect_range_N <- lmer(mean_range ~ DAP_Canopy_Height_r2m + aspect.r2m_con + (1|plot), data = SM_annual_Nighttime)
 
 sm_canopy_nonrandom_range <- lm(mean_range ~ DAP_Canopy_Height_r2m, data = SM_annual_Daytime)
-sm_canopy_aspect_range <- lm(mean_range~aspect.r2m, data = SM_annual_Daytime)
+sm_canopy_aspect_range <- lm(mean_range~aspect.r2m_con, data = SM_annual_Daytime)
 SM_canopy_rangdom <- lmer(mean_range~DAP_Canopy_Height_r2m+(1|plot), data = SM_annual_Daytime)
 summary(sm_canopy_aspect_range)
 anova(sm_canopy_aspect_range_D, sm_canopy_nonrandom_range, sm_canopy_aspect_range, SM_canopy_rangdom)
 
 SM_range_mods <- SM_annual_Daytime[complete.cases(SM_annual_Daytime$mean_range),]
 SM_range_mods <- left_join(SM_range_mods, SM_aspect)
-SM_range_pred <- SM_range_mods %>% select(c("mean_range", "DAP_Canopy_Height_r2m", "aspect.r2m_avg", "plot")) %>% mutate(aspect.r2m = aspect.r2m_avg)
+SM_range_pred <- SM_range_mods %>% dplyr::select(c("mean_range", "DAP_Canopy_Height_r2m",  "DAP_Canopy_Height_r15m", "aspect.r2m_con_avg", "plot")) %>% mutate(aspect.r2m_con = aspect.r2m_con_avg)
 sm_range_aspect_plot_D <- lmer(mean_range ~ DAP_Canopy_Height_r2m + (1|plot), data= SM_range_pred)
 SM_range_mods_N <- SM_annual_Nighttime[complete.cases(SM_annual_Nighttime$mean_range),]
 SM_range_mods_N <- left_join(SM_range_mods_N, SM_aspect)
-SM_range_pred_N <- SM_range_mods_N %>% select(c("mean_range", "DAP_Canopy_Height_r2m", "aspect.r2m_avg", "plot"))
+SM_range_pred_N <- SM_range_mods_N %>% dplyr::select(c("mean_range", "DAP_Canopy_Height_r2m", "DAP_Canopy_Height_r15m", "aspect.r2m_con_avg", "plot"))
 sm_range_aspect_plot_N <- lmer(mean_range ~ DAP_Canopy_Height_r2m + (1|plot), data= SM_range_pred_N)
 
-SM_range_pred$lm.aspect.plot <- predict(lmer(mean_sm ~ aspect.r2m + (1|plot), data = SM_range_mods))
+SM_range_pred$lm.aspect.plot <- predict(lmer(mean_sm ~ aspect.r2m_con + (1|plot), data = SM_range_mods))
 SM_range_pred$lm.canopy.aspect <- predict(sm_canopy_aspect_range)
 SM_range_pred$lm.canopy.aspect.plt_D <- predict(sm_range_aspect_plot_D)
 SM_range_mods_N$lm.canopy.aspect.plt_N <- predict(sm_range_aspect_plot_N)
-#SM_range_mods$lm.canopy.aspect.rsd.r2m <- SM_range_mods$mean_range - SM_range_mods$lm.canopy.aspect
-confidence_intervals <- confint(sm_canopy_aspect_range_D, level = 0.95)
+#SM_range_mods$lm.canopy.aspect.rsd.r2m_con <- SM_range_mods$mean_range - SM_range_mods$lm.canopy.aspect
+
+confidence_intervals <- as.data.frame(confint(SM_canopy_rangdom, level = 0.90)) 
+confidence_intervals$variable <- rownames(confidence_intervals)
+confidence_intervals <- confidence_intervals %>% pivot_longer(cols = c(`5 %`,`95 %`), names_to = "Interval", values_to = "Estimate")
+confidence_intervals_df <- confidence_intervals[which(grepl("DAP", confidence_intervals$variable)),]
+model_confidence_graph <- ggplot(confidence_intervals_df, aes(variable, Estimate)) + 
+  geom_point(aes(color = variable), size = 3) + ylab("Slope Estimate") + xlab("") + labs(color = "Model") +
+  scale_color_brewer(palette = "Dark2") + ylim(-5e-5, 5e-5) + 
+  geom_hline(yintercept = 0, linetype = "dashed", size = 2) + theme_cowplot(font_size = 20)
+
 pred <- cbind(SM_range_mods, merTools::predictInterval(sm_range_aspect_plot, which = "full"))
 
 cowplot::plot_grid(ggplot(SM_range_pred, aes(DAP_Canopy_Height_r2m, mean_range)) + 
-                     geom_point(aes(color = plot)) +
-                     geom_line(aes(DAP_Canopy_Height_r2m, lm.canopy.aspect.plt_D, group = plot, color = plot)) +
+                     geom_point(aes(color = as.factor(plot))) +
+                     geom_line(aes(DAP_Canopy_Height_r2m, lm.canopy.aspect.plt_D, group = plot, color = as.factor(plot))) +
                      #geom_smooth( size =NA, span = 0.5,method = "rml", alpha  = 0.2) +
                      #geom_abline(aes(intercept=`(Intercept)`, slope=DAP_Canopy_Height_r2m), as.data.frame(t(fixef(sm_canopy_aspect_plot)))) + 
                      #geom_line(aes(DAP_Canopy_Height_r2m,lwr, color  = plot, group = plot), linetype = "dashed") +
                      #geom_line(aes(DAP_Canopy_Height_r2m, upr, color = plot, group = plot), linetype = "dashed") + 
-                     ylab("Mean Daily range in Soil Moisture") + 
+                     ylab("Mean Daily range in Soil Moisture (% vol)") + 
                      labs(color = "Plot") +
-                     xlab("Mean Canopy Height (m)")+
+                     xlab("Mean Canopy Height (m) - 2 m Radius")+
                      theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
                      ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
                      ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-                     cowplot:: theme_cowplot() + theme(legend.position = "none"))
-                   ggplot(SM_range_mods, aes(aspect.r2m, mean_range)) + 
-                     geom_point(aes(color = plot)) +
-                     geom_line(aes(aspect.r2m, lm.aspect.plot, color = plot)) + 
+                     theme_bw(base_size = 20) + theme(legend.position = "none"), 
+                   ggplot(SM_range_pred, aes(DAP_Canopy_Height_r15m, mean_range)) + 
+                     geom_point(aes(color = as.factor(plot))) +
+                     #geom_line(aes(aspect.r2m_con, lm.aspect.plot, color = as.factor(plot))) + 
                      #stat_smooth(method = "lm", alpha  = 0.2, color = "black") +
-                     ylab("Mean Volumetric Soil Moisture (%)") + 
+                     ylab("Mean Daily RAnge in Soil Moisture (% vol)") + 
                      labs(color = "Plot") +
-                     xlab("Aspect (rad)")+
+                     xlab("Mean Canopy Height (m) - 15 m Radius")+
                      theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
                      ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
                      ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
@@ -229,7 +251,7 @@ cowplot::plot_grid(ggplot(SM_range_pred, aes(DAP_Canopy_Height_r2m, mean_range))
 
 
 
-
+MuMIn::r.squaredGLMM(SM_canopy_rangdom)
 #SD soil moisture 
 #sd soil moisture 
 sm_canopy_height_elevat <- lmer(sd_sm ~ DAP_Canopy_Height_r15m + elevation_r15m + (1|plot), data = SM_annual)
@@ -255,7 +277,7 @@ graph_mod <- ggplot(SM_range_mods, aes(DAP_Canopy_Height_r15m, sd_sm, group = pl
 
 library(plot3D)
 x <- SM_range_mods$DAP_Canopy_Height_r2m
-y <- SM_range_mods$aspect.r2m*180/pi
+y <- SM_range_mods$aspect.r2m_con*180/pi
 
 z <- SM_range_mods$mean_sm
 # Compute the linear regression (z = ax + by + d)
@@ -265,12 +287,12 @@ grid.lines = 26
 x.pred <- seq(min(x), max(x), length.out = grid.lines)
 y.pred <- seq(min(y), max(y), length.out = grid.lines)
 levels <- levels(SM_range_mods$plot)
-xy <- expand.grid( DAP_Canopy_Height_r2m = x.pred, aspect.r2m = y.pred, plot = levels)
+xy <- expand.grid( DAP_Canopy_Height_r2m = x.pred, aspect.r2m_con = y.pred, plot = levels)
 z.pred <- matrix(predict(sm_canopy_height_elevat, newdata = xy), 
                  nrow = grid.lines, ncol = grid.lines)
 # fitted points for droplines to surface
 fitpoints <- predict(sm_canopy_height_elevat)
-plot3D::scatter3D(SM_range_mods$DAP_Canopy_Height_r2m, SM_range_mods$aspect.r2m *180/pi, SM_range_mods$mean_sm, colvar = SM_range_mods$mean_sm, theta = 60, phi = 5, 
+plot3D::scatter3D(SM_range_mods$DAP_Canopy_Height_r2m, SM_range_mods$aspect.r2m_con *180/pi, SM_range_mods$mean_sm, colvar = SM_range_mods$mean_sm, theta = 60, phi = 5, 
                   surf = list(x = x.pred, y = y.pred, z = z.pred,  
                               facets = NA, fit = fitpoints), 
                   xlab = "Canopy Height (m)", ylab = "Aspect (rad)", zlab = "Mean Growing Season Soil Moisture (% vol)")
@@ -300,8 +322,8 @@ graph_mod <- ggplot(SM_range_mods, aes(DAP_Canopy_Height_r15m, min_sm, group = p
   theme_bw()
 confint(sm_canopy_height)
 
-graph_mod <- ggplot(SM_range_mods, aes(aspect.r15m, min_sm, group = plot, color = plot)) + 
-  geom_point(aes(aspect.r15m, min_sm)) +
+graph_mod <- ggplot(SM_range_mods, aes(aspect.r15m_con, min_sm, group = plot, color = plot)) + 
+  geom_point(aes(aspect.r15m_con, min_sm)) +
   stat_smooth(method = "lm", alpha = 0.2) +
   #geom_line(aes(DAP_Canopy_Height_r15m, lm.canopy.ht, group = plot, color = plot)) +
   #facet_wrap(~plot) +
@@ -310,19 +332,19 @@ graph_mod <- ggplot(SM_range_mods, aes(aspect.r15m, min_sm, group = plot, color 
 
 
 SM_range_mods <- SM_annual[which(SM_annual$min_sm != "Inf"),]
-model <- lmer(min_sm ~ DAP_Canopy_Cover_r15m + aspect.r15m + (1|plot), data = SM_range_mods)
+model <- lmer(min_sm ~ DAP_Canopy_Cover_r15m + aspect.r15m_con + (1|plot), data = SM_range_mods)
 model_cov <- lmer(min_sm ~ DAP_Canopy_Cover_r15m +  (1|plot), data = SM_range_mods)
-model_asp <- lmer(min_sm ~ aspect.r15m +  (1|plot), data = SM_range_mods)
+model_asp <- lmer(min_sm ~ aspect.r15m_con +  (1|plot), data = SM_range_mods)
 SM_range_mods$lm.canopy.cov <- predict(model)
 SM_range_mods$lm.canopy.cov.rs <- SM_range_mods$min_sm - SM_range_mods$lm.canopy.cov
 ##See if this fixes model assumptions 
 fit_plot <- ggplot(SM_range_mods, aes(lm.canopy.cov, lm.canopy.cov.rs)) + geom_point() + ggtitle("Residual plot, individual point level") +theme_bw()
 qnorm <- ggplot(SM_range_mods, aes(sample = lm.canopy.cov.rs)) +stat_qq() + ggtitle("Normality Plot") + theme_bw()
 hist <- ggplot(SM_range_mods, aes(lm.canopy.cov.rs)) + geom_density() + ggtitle("Error Distribution") +theme_bw()
-graph_mod <- ggplot(SM_range_mods, aes(aspect.r15m, min_sm, group = plot, color = plot)) + 
-  geom_point(aes(aspect.r15m, min_sm)) +
+graph_mod <- ggplot(SM_range_mods, aes(aspect.r15m_con, min_sm, group = plot, color = plot)) + 
+  geom_point(aes(aspect.r15m_con, min_sm)) +
   #stat_smooth(method = "lm", alpha = 0.2) +
-  geom_line(aes(aspect.r15m, lm.canopy.cov, group = plot, color = plot)) +
+  geom_line(aes(aspect.r15m_con, lm.canopy.cov, group = plot, color = plot)) +
   #facet_wrap(~plot) +
   labs(color = "month") +
   theme_bw()

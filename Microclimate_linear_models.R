@@ -18,6 +18,10 @@ climate_data <- climate_data %>%
 
 
 meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
+meta_data_asp <- select(meta_data, contains("aspect"),'Plotcode')
+meta_data_asp[,1:5] <- apply(meta_data_asp[,1:5], 2, function(x) { cos((pi/4) * (x*180)/pi) } )
+names(meta_data_asp) <- c(paste0(names(meta_data_asp)[1:5], "_con"), "Plotcode")
+meta_data <- left_join(meta_data, meta_data_asp)
 
 filter(meta_data, plot == "2")
 
@@ -172,16 +176,68 @@ ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Heig
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +theme_bw(base_size = 15)
 
 climate_modeling_Cov_long <-climate_modeling_annual %>% pivot_longer(cols = contains("Dap_Canopy_Cov"), names_to ="Canopy_Radius", values_to = "Cover") 
-ggplot(climate_modeling_Cov_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Cover_r2m", "DAP_Canopy_Cover_r15m")),
-       aes(Cover,mean_T)) + 
-  geom_point(aes(color = as.factor(plot))) + 
+lm_r_square <- function(data, resp_variable, det_variable) {
+  det_variable_list <- names(data)[which(grepl(det_variable, names(data)))]
+  data_det_vars <- data[, c(det_variable_list)]
+  data_det_vars <- apply(data_det_vars, 2, as.numeric)
+  
+  data_vars <- data.frame(data[, c(resp_variable, 'Plotcode','plot')], data_det_vars)
+  data_vars$plot <- as.factor(data_vars$plot)
+  levels(data_vars$plot) <- fs_seq
+  #data_vars <- distinct(data_transform)
+  data_1a <- data_vars[,c(resp_variable, det_variable_list[1], 'plot', 'Plotcode')] 
+  names(data_1a) <- c('y','x', 'plot', 'Plotcode')
+  data_2a <- data_vars[,c(resp_variable, det_variable_list[2],'plot', 'Plotcode')] 
+  names(data_2a) <- c('y','x', 'plot', 'Plotcode')
+  data_3a <- data_vars[,c(resp_variable, det_variable_list[3], 'plot', 'Plotcode')] 
+  names(data_3a) <- c('y','x', 'plot', 'Plotcode')
+  data_4a <- data_vars[,c(resp_variable, det_variable_list[4],'plot', 'Plotcode')] 
+  names(data_4a) <- c('y','x', 'plot', 'Plotcode')
+  data_5a <- data_vars[,c(resp_variable, det_variable_list[5], 'plot', 'Plotcode')] 
+  names(data_5a) <- c('y','x', 'plot', 'Plotcode')
+  
+  
+  #write models
+  lm1 <- lm(y~x, data = data_1a, na.action = na.exclude)
+  lm2 <- lm(y~x, data = data_2a, na.action = na.exclude)
+  lm3 <- lm(y~x, data = data_3a, na.action = na.exclude)
+  lm4 <- lm(y~x,data = data_4a, na.action = na.exclude)
+  lm5 <- lm(y~x, data = data_5a, na.action = na.exclude)
+  
+  # gather R^2
+  r_squar <- c(summary(lm1)$adj.r.squared, summary(lm2)$adj.r.squared, summary(lm3)$adj.r.squared, 
+               summary(lm4)$adj.r.squared, summary(lm5)$adj.r.squared)
+  return(r_squar)
+}
+
+soil_models <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T1"), resp_variable = 
+                             "max_T", det_variable = "DAP_Canopy_Height")
+surface_models <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T2"), resp_variable = 
+                                "max_T", det_variable = "DAP_Canopy_Height") 
+near_surface_models <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T3"), resp_variable = 
+                                                       "max_T", det_variable = "DAP_Canopy_Height") 
+
+model_R <- data.frame(Radius = c(2,5,10,15,20), 
+                      Soil = soil_models, 
+                      Surface = surface_models, Near_Surface =  near_surface_models) %>% 
+  pivot_longer(c = c('Soil', 'Surface', 'Near_Surface'), names_to = "Model", values_to = "adj.r.squared")
+                      
+variation <- ggplot(model_R, aes(Radius, adj.r.squared)) + geom_point(aes(color = Model), size = 3) +
+  geom_line(aes(color = Model), linetype = "dashed") +
+  ylab(paste('Adjusted Model R\u00b2')) + xlab("Canopy Radius (m)") + labs(color = "Model") +
+  scale_color_brewer(palette = "Dark2") +theme_bw(base_size = 20)
+
+facet_grid <- ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Height_r2m", "DAP_Canopy_Height_r15m") & sensor == "T1"),
+       aes(Mean_Canopy_Height, max_T)) + 
+  geom_point() + 
   geom_smooth(method = "lm", alpha = 0.2, color = "grey") +
-  ylab("Average Daily Maximum Temperature °C") + 
+  ylab("Average Daily Max Temperature °C") + 
   xlab("Average Canopy Height (m)") +
-  labs(color = "Plot") + 
   facet_grid(Canopy_Radius ~ sensor) +   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +theme_bw(base_size = 15)
+
+plot_grid(facet_grid, variation)
 
 
 library(cowplot)
@@ -192,16 +248,17 @@ library(ggeffects)
 
 
 # Annual models  ----------------------------------------------------------
-soil_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + elevation_r15m + (1|plot), 
+#soil_annual_lm_complex <- lmer(mean_T ~ DAP_Canopy_Height_r15m + (DAP_Canopy_Height_r15m | plot) + (1|plot), data = filter(climate_modeling_annual, sensor == "T1"))
+soil_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T1"))
-soil_annual_lm_cov <- lmer(mean_T ~ DAP_Canopy_Cover_r15m + aspect.r15m + elevation_r15m + (1|plot), 
+soil_annual_lm_cov <- lmer(mean_T ~ DAP_Canopy_Cover_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T1"))
 ggplot(climate_modeling_annual, aes(DAP_Canopy_Height_r15m, DAP_Canopy_Cover_r15m, group = plot, color = plot)) + 
   geom_point() + geom_smooth(method = "lm")
 plot(soil_annual_lm)
 
 #Nested model 1 - remove elevation because should be dealt with T1 
-soil_annual_lm_n1b <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + (1|plot), 
+soil_annual_lm_n1b <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + (1|plot), 
                           data = filter(climate_modeling_annual, sensor == "T1"))
 #Nested model 2 - remove aspect
 soil_annual_lm_n1a <- lmer(mean_T ~ DAP_Canopy_Height_r15m + elevation_r15m+ (1|plot), 
@@ -215,16 +272,16 @@ soil_annual_lm_n3  <- lm(mean_T ~ DAP_Canopy_Height_r15m,
 anova(soil_annual_lm, soil_annual_lm_n1a, soil_annual_lm_n1b, soil_annual_lm_n2, soil_annual_lm_n3)
 
 #### plot annual soil temperature models 
-avg_values <-climate_modeling_annual %>% subset(!is.na(mean_T)) %>% group_by(plot) %>% summarize(aspect.r15m_avg = mean(aspect.r15m), 
-                                                                                    elevation.r15m_avg = mean(elevation_r15m), 
+avg_values <-climate_modeling_annual %>% subset(!is.na(mean_T)) %>% group_by(plot) %>% summarize(aspect.r15m_con_avg = mean(aspect.r15m_con), 
+                                                                                    elevation.r15m_con_avg = mean(elevation_r15m), 
                                                                                     DAP_Canopy_Ht_r15m = mean(DAP_Canopy_Height_r15m))
 ##Create_Average Models for plotting 
 soil_temp_avgs <- climate_modeling_annual %>% filter(sensor == "T1") %>% left_join(avg_values) %>% subset(!is.na(mean_T))
-soil_annual_lm_plot <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_avg + elevation.r15m_avg + (1|plot), 
+soil_annual_lm_plot <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con_avg + elevation.r15m_con_avg + (1|plot), 
                             data = soil_temp_avgs)
 
-soil_annual_lm_plot_elev <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m_avg + elevation_r15m + (1|plot), data = soil_temp_avgs)
-soil_annual_lm_plot_asp <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m + elevation.r15m_avg + (1|plot), data = soil_temp_avgs)
+soil_annual_lm_plot_elev <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m_con_avg + elevation_r15m + (1|plot), data = soil_temp_avgs)
+soil_annual_lm_plot_asp <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m_con + elevation.r15m_con_avg + (1|plot), data = soil_temp_avgs)
 
 soil_temp_avgs$DAP_Canopy_mod_r15m <- predict(soil_annual_lm_plot)
 soil_temp_avgs$Elev_mod_r15m <- predict(soil_annual_lm_plot_elev)
@@ -240,7 +297,7 @@ canopy_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  cowplot:: theme_cowplot() + theme(legend.position = "none")
+  theme_bw(base_size = 15) #+ theme(legend.position = "none")
 elevation_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
   geom_point(aes(elevation_r15m, mean_T, color = plot)) + 
   geom_line(aes(elevation_r15m, Elev_mod_r15m, color = plot)) + 
@@ -252,8 +309,8 @@ elevation_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   cowplot:: theme_cowplot() + theme(legend.position = "none") 
 Aspect_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
-  geom_point(aes(aspect.r15m, mean_T, color = plot)) + 
-  geom_line(aes(aspect.r15m, Asp_mod_r15m, color = plot)) + 
+  geom_point(aes(aspect.r15m_con, mean_T, color = plot)) + 
+  geom_line(aes(aspect.r15m_con, Asp_mod_r15m, color = plot)) + 
   ylab("Mean Soil Temperature °C") + 
   labs(color = "Plot") +
   xlab("Aspect (Rad)")+
@@ -267,9 +324,9 @@ plot_grid(Aspect_soil_annual + theme(legend.position = "none"), canopy_soil_annu
           nrow = 1, rel_width = c(1,1,1,0.2))
 ## surface models
 
-surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + elevation_r15m + (1|plot), 
+surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T2"))
-surface_annual_lm_cov <- lmer(mean_T ~ DAP_Canopy_Cover_r15m + aspect.r15m + elevation_r15m + (1|plot), 
+surface_annual_lm_cov <- lmer(mean_T ~ DAP_Canopy_Cover_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                            data = filter(climate_modeling_annual, sensor == "T2"))
 anova(surface_annual_lm, surface_annual_lm_cov)
 ggplot(climate_modeling_annual, aes(DAP_Canopy_Height_r15m, DAP_Canopy_Cover_r15m, group = plot, color = plot)) + 
@@ -277,7 +334,7 @@ ggplot(climate_modeling_annual, aes(DAP_Canopy_Height_r15m, DAP_Canopy_Cover_r15
 plot(surface_annual_lm)
 
 #Nested model 1 - remove elevation because should be dealt with T2 
-surface_annual_lm_n1b <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + (1|plot), 
+surface_annual_lm_n1b <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + (1|plot), 
                            data = filter(climate_modeling_annual, sensor == "T2"))
 #Nested model 2 - remove aspect
 surface_annual_lm_n1a <- lmer(mean_T ~ DAP_Canopy_Height_r15m + elevation_r15m+ (1|plot), 
@@ -292,9 +349,9 @@ anova(surface_annual_lm, surface_annual_lm_n1a, surface_annual_lm_n1b, surface_a
 
 ## near_surface models
 
-near_surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + elevation_r15m + (1|plot), 
+near_surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                           data = filter(climate_modeling_annual, sensor == "T3"))
-near_surface_annual_lm_cov <- lmer(mean_T ~ DAP_Canopy_Cover_r15m + aspect.r15m + elevation_r15m + (1|plot), 
+near_surface_annual_lm_cov <- lmer(mean_T ~ DAP_Canopy_Cover_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                               data = filter(climate_modeling_annual, sensor == "T3"))
 anova(near_surface_annual_lm, near_surface_annual_lm_cov)
 ggplot(climate_modeling_annual, aes(DAP_Canopy_Height_r15m, DAP_Canopy_Cover_r15m, group = plot, color = plot)) + 
@@ -302,7 +359,7 @@ ggplot(climate_modeling_annual, aes(DAP_Canopy_Height_r15m, DAP_Canopy_Cover_r15
 plot(near_surface_annual_lm)
 
 #Nested model 1 - remove elevation because should be dealt with T3 
-near_surface_annual_lm_n1b <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m + (1|plot), 
+near_surface_annual_lm_n1b <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + (1|plot), 
                               data = filter(climate_modeling_annual, sensor == "T3"))
 #Nested model 2 - remove aspect
 near_surface_annual_lm_n1a <- lmer(mean_T ~ DAP_Canopy_Height_r15m + elevation_r15m+ (1|plot), 
@@ -328,14 +385,15 @@ model_confidence_df <- model_confidence %>% mutate(lwr_est = as.numeric(.$`2.5 %
 model_confidence_df <- model_confidence_df[which(grepl("r15m", model_confidence_df$variable)),]
 
 
-model_confidence_graph <- ggplot(model_confidence_df, aes(model, Estimate)) + 
+model_confidence_graph <- ggplot(model_confidence_df %>% filter(variable == "DAP_Canopy_Height_r15m" & model == "soil_model"), aes(model, Estimate)) + 
   geom_point(aes(color = model), size = 3) +geom_line(aes(color = model), size = 2) +  ylab("Slope Estimate") + xlab("") + labs(color = "Model") +
     scale_color_brewer(palette = "Dark2") + ylim(-0.5, 0.5) +
-  facet_wrap(~variable) +
-  geom_hline(yintercept = 0, linetype = "dashed", size = 2) + theme_cowplot(font_size = 20) + theme(legend.position = "bottom",axis.title.x=element_blank(),
+  #facet_wrap(~variable) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 2) + 
+  theme_bw(base_size = 20) + theme(legend.position = "bottom",axis.title.x=element_blank(),
                                                                                  axis.text.x=element_blank(),
                                                                                  axis.ticks.x=element_blank())
-
+MuMIn::r.squaredGLMM(soil_annual_lm)
 
 
 # Monthly Models  ---------------------------------------------------------

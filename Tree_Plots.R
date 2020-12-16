@@ -43,7 +43,7 @@ trees <- trees %>%
 #Read in plots with fire severity to order the loggers 
 #write sequence to name for numbers 
 seq <- seq(from =1 , to = 10, by = 1)
-fs_seq <- paste0("fs", seq)
+fs_seq <- paste0(seq)
 plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
 plots@data <- plots@data %>% 
   arrange(X_firemean) %>%
@@ -259,8 +259,8 @@ CHM_field_2m <- merge(CHM_max_height_2m, summary_trees, by = "Plot")
 library(ggplot2)
 max_plot <- ggplot(CHM_max_field@data, aes(x=chm_2m_10cmres+1.2, y = fieldhtmax_trees)) +
   geom_point( aes(color = plot_num), size = 3) + 
-  ylab("Maximum measured height (m)") +
-  xlab("Maximum DAP Pixel (m)")+
+  ylab("Maximum Measured Height (m)") +
+  xlab("Maximum DAP Height (m)")+
   xlim(0,35) + 
   ylim(0,35) + 
   stat_smooth(method = "lm", formula = y~ x) + 
@@ -269,25 +269,25 @@ max_plot <- ggplot(CHM_max_field@data, aes(x=chm_2m_10cmres+1.2, y = fieldhtmax_
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
   guides(color = F) + 
   cowplot::theme_cowplot() 
-  #ggtitle("Max DAP vs. Field Ht (m)")
+  ggtitle("Max DAP vs. Field Ht (m)") +
 mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres+1.2, y = fieldhtmean_trees)) +
   geom_point(aes(color = as.factor(plot_num)), size = 3) +
   stat_smooth(method = "lm") +
   ylab("Mean measured height (m)") +
-  xlab("Mean DAP Pixel (m)")+
+  xlab("Mean DAP Height (m)")+
   xlim(0,35) + 
   ylim(0,35) +
   geom_abline(intercept = 0, slope=1) + 
   ggthemes::scale_color_tableau(palette = "Classic Cyclic", na.value = T, drop = F) +
   #ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
   labs(color = "Plot") + 
-  cowplot::theme_cowplot() 
-  #ggtitle("Mean DAP vs. Field Ht")
+  cowplot::theme_cowplot() +
+  ggtitle("Mean DAP vs. Field Ht")
 
 
-# save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/HeightVerification_Plots.jpg',
-#           cowplot::plot_grid(max_plot, mean_plot, rel_widths = c(1.2, 1.3)),
-#           base_width =7.5, base_height = 4)
+save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/HeightVerification_Plots.jpg',
+          cowplot::plot_grid(max_plot, mean_plot, rel_widths = c(1.2, 1.3)),
+          base_width =7.5, base_height = 4)
 
 
 lm_tree_height_max <- lm(fieldhtmax_trees ~ chm_2m_10cmres , CHM_max_field@data)
