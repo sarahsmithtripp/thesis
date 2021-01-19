@@ -316,57 +316,6 @@ anova(soil_annual_lm, soil_annual_lm_n1a, soil_annual_lm_n1b, soil_annual_lm_n2,
 ## soil_annaul_Lm_n1b is the best model 
 
 
-#### plot annual soil temperature models 
-avg_values <-climate_modeling_annual %>% subset(!is.na(mean_T)) %>% group_by(plot) %>% summarize(aspect.r15m_con_avg = mean(aspect.r15m_con), 
-                                                                                    elevation.r15m_con_avg = mean(elevation_r15m), 
-                                                                                    DAP_Canopy_Ht_r15m = mean(DAP_Canopy_Height_r15m))
-##Create_Average Models for plotting 
-soil_temp_avgs <- climate_modeling_annual %>% filter(sensor == "T1") %>% left_join(avg_values) %>% subset(!is.na(mean_T))
-soil_annual_lm_plot <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con_avg + elevation.r15m_con_avg + (1|plot), 
-                            data = soil_temp_avgs)
-
-soil_annual_lm_plot_elev <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m_con_avg + elevation_r15m + (1|plot), data = soil_temp_avgs)
-soil_annual_lm_plot_asp <- lmer(mean_T ~ DAP_Canopy_Ht_r15m + aspect.r15m_con + elevation.r15m_con_avg + (1|plot), data = soil_temp_avgs)
-
-soil_temp_avgs$DAP_Canopy_mod_r15m <- predict(soil_annual_lm_plot)
-soil_temp_avgs$Elev_mod_r15m <- predict(soil_annual_lm_plot_elev)
-soil_temp_avgs$Asp_mod_r15m <- predict(soil_annual_lm_plot_asp)
-
-soil_temp_avgs$plot <- as.factor(soil_temp_avgs$plot)
-canopy_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
-  geom_point(aes(DAP_Canopy_Height_r15m, mean_T, color = plot)) + 
-  geom_line(aes(DAP_Canopy_Height_r15m, DAP_Canopy_mod_r15m, color = plot)) + 
-  ylab("Mean Soil Temperature °C") + 
-  labs(color = "Plot") +
-  xlab("Mean Canopy Height (m)")+
-  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
-  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
-  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  theme_bw(base_size = 15) #+ theme(legend.position = "none")
-elevation_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
-  geom_point(aes(elevation_r15m, mean_T, color = plot)) + 
-  geom_line(aes(elevation_r15m, Elev_mod_r15m, color = plot)) + 
-  ylab("Mean Soil Temperature °C") + 
-  labs(color = "Plot") +
-  xlab("Elevation (m)")+
-  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
-  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
-  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  cowplot:: theme_cowplot() + theme(legend.position = "none") 
-Aspect_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
-  geom_point(aes(aspect.r15m_con, mean_T, color = plot)) + 
-  geom_line(aes(aspect.r15m_con, Asp_mod_r15m, color = plot)) + 
-  ylab("Mean Soil Temperature °C") + 
-  labs(color = "Plot") +
-  xlab("Aspect (Rad)")+
-  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
-  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
-  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  cowplot:: theme_cowplot() 
-leg <- get_legend(Aspect_soil_annual)
-
-plot_grid(Aspect_soil_annual + theme(legend.position = "none"), canopy_soil_annual, elevation_soil_annual, leg, 
-          nrow = 1, rel_width = c(1,1,1,0.2))
 
 # Surface Models  ---------------------------------------------------------
 
@@ -481,6 +430,68 @@ MuMIn::r.squaredGLMM(soil_moist_annual_lm_n1b)
 
 # Annual Model Graphs  ----------------------------------------------------
 
+#### plot annual soil temperature models 
+avg_values <-climate_modeling_annual %>% subset(!is.na(mean_T)) %>% group_by(plot) %>% summarize(aspect.r15m_con_avg = mean(aspect.r15m_con), 
+                                                                                                 elevation.r15m_con_avg = mean(elevation_r15m), 
+                                                                                                 DAP_Canopy_Ht_r15m = mean(DAP_Canopy_Height_r15m)) %>% 
+  right_join(climate_modeling_annual) %>% subset(!is.na(mean_T))
+##Create_Average Models for plotting 
+soil_annual_lm_n1b_avg <- lmer(mean_T ~ DAP_Canopy_Height_r15m  + aspect.r15m_con_avg
+                               + (1|plot), data = filter(avg_values, sensor == "T1"))
+
+surface_annual_lm_avg <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con_avg+ elevation.r15m_con_avg+ 
+                                (1|plot), data = filter(avg_values, sensor == "T2"))
+
+near_surface_annual_lm_avg <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con_avg + elevation.r15m_con_avg + 
+                                 (1|plot), data = filter(avg_values, sensor == "T3"))
+
+predictions <- data.frame(rbind( 
+  cbind(predict(soil_annual_lm_n1b_avg), rep("T1", length(predict(soil_annual_lm_n1b_avg)))),
+  cbind(predict(surface_annual_lm_avg), rep("T2", length(predict(surface_annual_lm_avg)))), 
+  cbind(predict(near_surface_annual_lm_avg), rep("T3", length(predict(near_surface_annual_lm_avg))))))
+names(predictions) <- c('predictions', 'sensor')
+predictions$sensor <- as.factor(predictions$sensor)
+avg_values$predictions <- predictions$predictions  
+avg_values_predictions <- avg_values %>%  mutate(plot = as.factor(plot), 
+         predictions = as.numeric(predictions))
+
+
+
+canopy_soil_annual <- ggplot(avg_values_predictions , aes(group = plot)) + 
+  geom_point(aes(DAP_Canopy_Height_r15m, mean_T, color = plot)) + 
+  geom_line(aes(DAP_Canopy_Height_r15m, predictions, color = plot)) + 
+  ylab("Mean Soil Temperature °C") + 
+  labs(color = "Plot") +
+  xlab("Mean Canopy Height (m)")+
+  facet_wrap(~sensor) +
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  theme_bw(base_size = 15) #+ theme(legend.position = "none")
+elevation_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
+  geom_point(aes(elevation_r15m, mean_T, color = plot)) + 
+  geom_line(aes(elevation_r15m, Elev_mod_r15m, color = plot)) + 
+  ylab("Mean Soil Temperature °C") + 
+  labs(color = "Plot") +
+  xlab("Elevation (m)")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot() + theme(legend.position = "none") 
+Aspect_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
+  geom_point(aes(aspect.r15m_con, mean_T, color = plot)) + 
+  geom_line(aes(aspect.r15m_con, Asp_mod_r15m, color = plot)) + 
+  ylab("Mean Soil Temperature °C") + 
+  labs(color = "Plot") +
+  xlab("Aspect (Rad)")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  cowplot:: theme_cowplot() 
+leg <- get_legend(Aspect_soil_annual)
+
+plot_grid(Aspect_soil_annual + theme(legend.position = "none"), canopy_soil_annual, elevation_soil_annual, leg, 
+          nrow = 1, rel_width = c(1,1,1,0.2))
 
 
 # Monthly Models  ---------------------------------------------------------
