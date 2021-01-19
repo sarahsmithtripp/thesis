@@ -3,6 +3,13 @@
 ### reads in data submitted to soiltemp database that is clipped in the microclimate_logger_parsing - removing erroneous values 
 library(tidyverse)
 library(cowplot)
+library(lme4)
+library(MuMIn)
+library(lme4)
+library(lmtest)
+library(ggeffects)
+
+
 seq <- seq(from =1 , to = 10, by = 1)
 fs_seq <- paste0("fs", seq)
 
@@ -18,7 +25,7 @@ climate_data <- climate_data %>%
 
 
 meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
-meta_data_asp <- select(meta_data, contains("aspect"),'Plotcode')
+meta_data_asp <- dplyr::select(meta_data, contains("aspect"),'Plotcode')
 meta_data_asp[,1:5] <- apply(meta_data_asp[,1:5], 2, function(x) { cos((pi/4) * (x*180)/pi) } )
 names(meta_data_asp) <- c(paste0(names(meta_data_asp)[1:5], "_con"), "Plotcode")
 meta_data <- left_join(meta_data, meta_data_asp)
@@ -141,7 +148,7 @@ Range_T_graphs <- plotter(climate_modeling, resp_variable = 'range_T1_m', det_va
 max_T_graphs <- plotter(climate_modeling, resp_variable =  'max_T1_m', det_variable = "DAP_Canopy_Height", transform = F, label = "Mean Maximum Daily Temperature by Month")
 min_T_graphs <- plotter(climate_modeling, resp_variable = 'min_T1_m', det_variable = "DAP_Canopy_Height", transform = T, label = "Mean Minimum Daily Temperature by Month")
 
-pdf(file = "D:/Data/SmithTripp/Gavin_Lake/Figures/SoilTemp_DataExpl.pdf", width = 14, height = 9)
+#pdf(file = "D:/Data/SmithTripp/Gavin_Lake/Figures/SoilTemp_DataExpl.pdf", width = 14, height = 9)
 
 Range_T_graphs
 
@@ -149,16 +156,20 @@ max_T_graphs
 
 min_T_graphs
 
-dev.off()
+#dev.off()
 
 climate_modeling_annual <- climate_data_fix %>% 
+  #group_by(Plotcode) %>% 
+  #mutate(mean_sm = mean(vol_sm, na.rm = T)) %>%
   pivot_longer(cols = c("T1", "T2", "T3"), names_to = 'sensor', values_to = 'Temp_C') %>% 
   group_by(Plotcode, sensor, DateTime) %>% 
   mutate(range_d = max(Temp_C) - min(Temp_C), 
          min_d = min(Temp_C), 
          max_d = max(Temp_C))%>% 
   group_by(Plotcode, sensor) %>% 
-  summarise(range_T = mean(range_d, na.rm = T), 
+  summarise(
+    mean_sm = mean(vol_sm, na.rm = T),
+    range_T = mean(range_d, na.rm = T), 
             max_T = mean(max_d, na.rm = T),
             min_T = mean(min_d, na.rm = T), 
             mean_T = mean(Temp_C, na.rm = T)) %>% 
@@ -176,56 +187,76 @@ ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Heig
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +theme_bw(base_size = 15)
 
 climate_modeling_Cov_long <-climate_modeling_annual %>% pivot_longer(cols = contains("Dap_Canopy_Cov"), names_to ="Canopy_Radius", values_to = "Cover") 
-lm_r_square <- function(data, resp_variable, det_variable) {
-  det_variable_list <- names(data)[which(grepl(det_variable, names(data)))]
-  data_det_vars <- data[, c(det_variable_list)]
-  data_det_vars <- apply(data_det_vars, 2, as.numeric)
-  
-  data_vars <- data.frame(data[, c(resp_variable, 'Plotcode','plot')], data_det_vars)
-  data_vars$plot <- as.factor(data_vars$plot)
-  levels(data_vars$plot) <- fs_seq
+lm_r_square <- function(data, resp_variable, fixed) {
+  data$plot <- as.factor(data$plot)
+  levels(data$plot) <- fs_seq
   #data_vars <- distinct(data_transform)
-  data_1a <- data_vars[,c(resp_variable, det_variable_list[1], 'plot', 'Plotcode')] 
-  names(data_1a) <- c('y','x', 'plot', 'Plotcode')
-  data_2a <- data_vars[,c(resp_variable, det_variable_list[2],'plot', 'Plotcode')] 
-  names(data_2a) <- c('y','x', 'plot', 'Plotcode')
-  data_3a <- data_vars[,c(resp_variable, det_variable_list[3], 'plot', 'Plotcode')] 
-  names(data_3a) <- c('y','x', 'plot', 'Plotcode')
-  data_4a <- data_vars[,c(resp_variable, det_variable_list[4],'plot', 'Plotcode')] 
-  names(data_4a) <- c('y','x', 'plot', 'Plotcode')
-  data_5a <- data_vars[,c(resp_variable, det_variable_list[5], 'plot', 'Plotcode')] 
-  names(data_5a) <- c('y','x', 'plot', 'Plotcode')
+  data_1 <- data %>% dplyr::select(paste(resp_variable), 'plot', 'Plotcode', contains("r2m"))
+  names(data_1) <- c('y', 'plot', 'Plotcode', 'Canopy_ht', 'Canopy_cov', 'elevation', 'aspect', 'slope', 'max_canopy', 'aspect_con')
+  data_2 <- data %>% dplyr::select(paste(resp_variable), 'plot', 'Plotcode', contains("r5m"))
+  names(data_2) <- c('y','plot', 'Plotcode', 'Canopy_ht', 'Canopy_cov', 'elevation', 'aspect', 'slope', 'max_canopy', 'aspect_con')
+  data_3 <- data %>% dplyr::select(paste(resp_variable), 'plot', 'Plotcode', contains("r10m"))
+  names(data_3) <- c('y', 'plot', 'Plotcode', 'Canopy_ht', 'Canopy_cov', 'elevation', 'aspect', 'slope', 'max_canopy', 'aspect_con')
+  data_4 <- data %>% dplyr::select(paste(resp_variable), 'plot', 'Plotcode', contains("r15m"))
+  names(data_4) <- c('y', 'plot', 'Plotcode', 'Canopy_ht', 'Canopy_cov', 'elevation', 'aspect', 'slope', 'max_canopy', 'aspect_con')
+  data_5 <- data %>% dplyr::select(paste(resp_variable), 'plot', 'Plotcode', contains("r15m"))
+  names(data_5) <- c('y', 'plot', 'Plotcode', 'Canopy_ht', 'Canopy_cov', 'elevation', 'aspect', 'slope', 'max_canopy', 'aspect_con')
   
   
   #write models
-  lm1 <- lm(y~x, data = data_1a, na.action = na.exclude)
-  lm2 <- lm(y~x, data = data_2a, na.action = na.exclude)
-  lm3 <- lm(y~x, data = data_3a, na.action = na.exclude)
-  lm4 <- lm(y~x,data = data_4a, na.action = na.exclude)
-  lm5 <- lm(y~x, data = data_5a, na.action = na.exclude)
+  lm1 <- lmer(y ~ Canopy_ht + aspect_con + elevation + (1|plot), data = data_1)
+  lm2 <- lmer(y ~ Canopy_ht + aspect_con + elevation + (1|plot), data = data_2)
+  lm3 <- lmer(y ~ Canopy_ht + aspect_con + elevation + (1|plot), data = data_3)
+  lm4 <- lmer(y ~ Canopy_ht + aspect_con + elevation + (1|plot), data = data_4)
+  lm5 <- lmer(y ~ Canopy_ht + aspect_con + elevation + (1|plot), data = data_5)
+  
   
   # gather R^2
-  r_squar <- c(summary(lm1)$adj.r.squared, summary(lm2)$adj.r.squared, summary(lm3)$adj.r.squared, 
-               summary(lm4)$adj.r.squared, summary(lm5)$adj.r.squared)
-  return(r_squar)
+  if(fixed == T) {
+    #return fixed correlation
+  r_squar <- c(r.squaredGLMM(lm1)[1], r.squaredGLMM(lm2)[1], r.squaredGLMM(lm3)[1], 
+               r.squaredGLMM(lm4)[1], r.squaredGLMM(lm5)[1])
+
+  }
+  else if (fixed == F) {
+    
+    #return full model correlation
+  r_squar <-  c(r.squaredGLMM(lm1)[2], r.squaredGLMM(lm2)[2], r.squaredGLMM(lm3)[2], 
+                    r.squaredGLMM(lm4)[2], r.squaredGLMM(lm5)[2])
+  }
 }
 
+soil_models_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T1"), resp_variable = 
+                             "mean_T", fixed = T)
+surface_models_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T2"), resp_variable = 
+                                "mean_T", fixed = T) 
+near_surface_models_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T3"), resp_variable = 
+                                                       "mean_T", fixed = T) 
 soil_models <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T1"), resp_variable = 
-                             "max_T", det_variable = "DAP_Canopy_Height")
+                             "mean_T", fixed = F)
 surface_models <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T2"), resp_variable = 
-                                "max_T", det_variable = "DAP_Canopy_Height") 
+                                "mean_T", fixed = F) 
 near_surface_models <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T3"), resp_variable = 
-                                                       "max_T", det_variable = "DAP_Canopy_Height") 
+                                     "mean_T", fixed = F) 
 
-model_R <- data.frame(Radius = c(2,5,10,15,20), 
+model_R_all <- data.frame(Radius = c(2,5,10,15,20), 
                       Soil = soil_models, 
-                      Surface = surface_models, Near_Surface =  near_surface_models) %>% 
-  pivot_longer(c = c('Soil', 'Surface', 'Near_Surface'), names_to = "Model", values_to = "adj.r.squared")
+                      Surface = surface_models, Near_Surface =  near_surface_models)  %>% 
+  pivot_longer(c = c('Soil', 'Surface', 'Near_Surface'), names_to = "Model", values_to = "Random + Fixed")
+
+model_R_fixed <- data.frame(Radius = c(2,5,10,15,20), 
+                          Soil = soil_models_fixed, 
+                          Surface = surface_models_fixed, Near_Surface =  near_surface_models_fixed)  %>% 
+  pivot_longer(c = c('Soil', 'Surface', 'Near_Surface'), names_to = "Model", values_to = "Fixed") %>% 
+  left_join(model_R_all) %>%
+  pivot_longer(c = c('Random + Fixed', 'Fixed'), names_to = "R_squar_type", values_to = "adj.r")
                       
-variation <- ggplot(model_R, aes(Radius, adj.r.squared)) + geom_point(aes(color = Model), size = 3) +
+variation_fixed <- ggplot(model_R_fixed, aes(Radius, adj.r)) + geom_point(aes(color = Model), size = 3) +
   geom_line(aes(color = Model), linetype = "dashed") +
-  ylab(paste('Adjusted Model R\u00b2')) + xlab("Canopy Radius (m)") + labs(color = "Model") +
-  scale_color_brewer(palette = "Dark2") +theme_bw(base_size = 20)
+  facet_wrap(~ R_squar_type) + 
+  ylab(paste('Adjusted Model R\u00b2')) + xlab("Radius (m)") + labs(color = "Model") +
+  scale_color_brewer(palette = "Dark2") +theme_bw(base_size = 20) 
+
 
 facet_grid <- ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Height_r2m", "DAP_Canopy_Height_r15m") & sensor == "T1"),
        aes(Mean_Canopy_Height, max_T)) + 
@@ -240,20 +271,32 @@ facet_grid <- ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("D
 plot_grid(facet_grid, variation)
 
 
-library(cowplot)
-library(lme4)
-library(lmtest)
-library(ggeffects)
+## soil moisture ### 
+
+sm_r_square <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T3"), resp_variable = 
+                                                    "mean_sm", fixed = F) 
+
+sm_r_square_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T3"), resp_variable = 
+                             "mean_sm", fixed = T) 
+
 
 
 
 # Annual models  ----------------------------------------------------------
+
+# Temperature -------------------------------------------------------------
+
+
+# soil temperatur ---------------------------------------------------------
+
+
+
 #soil_annual_lm_complex <- lmer(mean_T ~ DAP_Canopy_Height_r15m + (DAP_Canopy_Height_r15m | plot) + (1|plot), data = filter(climate_modeling_annual, sensor == "T1"))
 soil_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T1"))
 soil_annual_lm_cov <- lmer(mean_T ~ DAP_Canopy_Cover_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T1"))
-ggplot(climate_modeling_annual, aes(DAP_Canopy_Height_r15m, DAP_Canopy_Cover_r15m, group = plot, color = plot)) + 
+ggplot(climate_modeling_annual, aes(DAP_Canopy_Height_r15m, DAP_Canopy_Cover_r15m, group = plot, color = as.factor(plot))) + 
   geom_point() + geom_smooth(method = "lm")
 plot(soil_annual_lm)
 
@@ -270,6 +313,8 @@ soil_annual_lm_n2 <- lmer(mean_T ~ DAP_Canopy_Height_r15m + (1|plot),
 soil_annual_lm_n3  <- lm(mean_T ~ DAP_Canopy_Height_r15m,
                           data = filter(climate_modeling_annual, sensor == "T1"))
 anova(soil_annual_lm, soil_annual_lm_n1a, soil_annual_lm_n1b, soil_annual_lm_n2, soil_annual_lm_n3)
+## soil_annaul_Lm_n1b is the best model 
+
 
 #### plot annual soil temperature models 
 avg_values <-climate_modeling_annual %>% subset(!is.na(mean_T)) %>% group_by(plot) %>% summarize(aspect.r15m_con_avg = mean(aspect.r15m_con), 
@@ -322,7 +367,8 @@ leg <- get_legend(Aspect_soil_annual)
 
 plot_grid(Aspect_soil_annual + theme(legend.position = "none"), canopy_soil_annual, elevation_soil_annual, leg, 
           nrow = 1, rel_width = c(1,1,1,0.2))
-## surface models
+
+# Surface Models  ---------------------------------------------------------
 
 surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T2"))
@@ -346,8 +392,12 @@ surface_annual_lm_n2 <- lmer(mean_T ~ DAP_Canopy_Height_r15m + (1|plot),
 surface_annual_lm_n3  <- lm(mean_T ~ DAP_Canopy_Height_r15m,
                          data = filter(climate_modeling_annual, sensor == "T2"))
 anova(surface_annual_lm, surface_annual_lm_n1a, surface_annual_lm_n1b, surface_annual_lm_n2, surface_annual_lm_n3)
+### best model is full model
 
-## near_surface models
+
+
+# Near Surface  -----------------------------------------------------------
+
 
 near_surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
                           data = filter(climate_modeling_annual, sensor == "T3"))
@@ -373,8 +423,9 @@ near_surface_annual_lm_n3  <- lm(mean_T ~ DAP_Canopy_Height_r15m,
 anova(near_surface_annual_lm, near_surface_annual_lm_n1a, near_surface_annual_lm_n1b, near_surface_annual_lm_n2, near_surface_annual_lm_n3)
 
 ### plot confidence intervales
-model_confidence <- as.data.frame(rbind(cbind(confint(soil_annual_lm), rep("soil_model", 6)), 
+model_confidence <- as.data.frame(rbind( 
                           cbind(confint(surface_annual_lm), rep("surface_model", 6)),
+                          cbind(rbind(confint(soil_annual_lm_n1b), c("NA", "NA")), rep("soil_model", 6)),
                           cbind(confint(near_surface_annual_lm), rep("near_surface_model", 6))))
 model_confidence$variable <- rep(rownames(model_confidence)[1:6], 3)
 model_confidence_df <- model_confidence %>% mutate(lwr_est = as.numeric(.$`2.5 %`), 
@@ -385,15 +436,51 @@ model_confidence_df <- model_confidence %>% mutate(lwr_est = as.numeric(.$`2.5 %
 model_confidence_df <- model_confidence_df[which(grepl("r15m", model_confidence_df$variable)),]
 
 
-model_confidence_graph <- ggplot(model_confidence_df %>% filter(variable == "DAP_Canopy_Height_r15m" & model == "soil_model"), aes(model, Estimate)) + 
+model_confidence_graph <- ggplot(model_confidence_df, #%>% filter(variable == "DAP_Canopy_Height_r15m"), 
+                                 aes(model, Estimate)) + 
   geom_point(aes(color = model), size = 3) +geom_line(aes(color = model), size = 2) +  ylab("Slope Estimate") + xlab("") + labs(color = "Model") +
     scale_color_brewer(palette = "Dark2") + ylim(-0.5, 0.5) +
-  #facet_wrap(~variable) +
+  facet_wrap(~variable) +
   geom_hline(yintercept = 0, linetype = "dashed", size = 2) + 
   theme_bw(base_size = 20) + theme(legend.position = "bottom",axis.title.x=element_blank(),
                                                                                  axis.text.x=element_blank(),
                                                                                  axis.ticks.x=element_blank())
 MuMIn::r.squaredGLMM(soil_annual_lm)
+
+
+
+
+# Soil Moisture  ----------------------------------------------------------
+
+soil_moist_annual_lm <- lmer(log(mean_sm) ~ DAP_Canopy_Height_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
+                               data = filter(climate_modeling_annual, sensor == "T3" & mean_sm < 0.6))
+soil_moist_annual_lm_cov <- lmer(mean_sm ~ DAP_Canopy_Cover_r15m + aspect.r15m_con + elevation_r15m + (1|plot), 
+                                   data = filter(climate_modeling_annual, sensor == "T3"))
+anova(soil_moist_annual_lm, soil_moist_annual_lm_cov)
+
+plot(soil_moist_annual_lm)
+
+#Nested model 1 - remove elevation because should be dealt with T3 
+soil_moist_annual_lm_n1b <- lmer(log(mean_sm) ~ DAP_Canopy_Height_r15m + aspect.r15m_con + (1|plot), 
+                                   data = filter(climate_modeling_annual, sensor == "T3"))
+#Nested model 2 - remove aspect
+soil_moist_annual_lm_n1a <- lmer(log(mean_sm) ~ DAP_Canopy_Height_r15m + elevation_r15m+ (1|plot), 
+                                   data = filter(climate_modeling_annual, sensor == "T3"))
+#remove all variables not Canopy Height 
+soil_moist_annual_lm_n2 <- lmer(log(mean_sm) ~ DAP_Canopy_Height_r15m + (1|plot), 
+                                  data = filter(climate_modeling_annual, sensor == "T3"))
+#remove random plot 
+soil_moist_annual_lm_n3  <- lm(log(mean_sm) ~ DAP_Canopy_Height_r15m,
+                                 data = filter(climate_modeling_annual, sensor == "T3" & mean_sm < 0.6))
+anova(soil_moist_annual_lm, soil_moist_annual_lm_n1a, soil_moist_annual_lm_n1b, soil_moist_annual_lm_n2, soil_moist_annual_lm_n3)
+
+MuMIn::r.squaredGLMM(soil_moist_annual_lm_n1b)
+
+
+
+
+# Annual Model Graphs  ----------------------------------------------------
+
 
 
 # Monthly Models  ---------------------------------------------------------
