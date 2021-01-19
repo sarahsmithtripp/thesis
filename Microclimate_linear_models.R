@@ -431,13 +431,23 @@ MuMIn::r.squaredGLMM(soil_moist_annual_lm_n1b)
 # Annual Model Graphs  ----------------------------------------------------
 
 #### plot annual soil temperature models 
-avg_values <-climate_modeling_annual %>% subset(!is.na(mean_T)) %>% group_by(plot) %>% summarize(aspect.r15m_con_avg = mean(aspect.r15m_con), 
-                                                                                                 elevation.r15m_con_avg = mean(elevation_r15m), 
-                                                                                                 DAP_Canopy_Ht_r15m = mean(DAP_Canopy_Height_r15m)) %>% 
-  right_join(climate_modeling_annual) %>% subset(!is.na(mean_T))
+climate_modeling_annual_na.omit <- subset(climate_modeling_annual, !is.na(mean_T)) %>% filter(sensor == "T1")
+ avg_values_soil <-climate_modeling_annual_na.omit %>% group_by(plot) %>% summarize(#Plotcode = Plotcode,
+#                                                                                                  DAP_Canopy_Height_r15m = DAP_Canopy_Height_r15m, 
+#                                                                                                  sensor = sensor, 
+#                                                                                                  mean_T = mean_T, 
+                                                                                                 aspect.r15m_con_avg = mean(aspect.r15m_con), 
+                                                                                                 elevation.r15m_con_avg = mean(elevation_r15m)) 
+
+climate_modeling_annual_na.omit <- left_join(climate_modeling_annual_na.omit, avg_values_soil) 
+soil_annual_lm_n1b_avg <-   lmer(mean_T ~ DAP_Canopy_Height_r15m  + aspect.r15m_con_avg
+                                 + (1|plot), data = filter(avg_values_mods, sensor == "T1"))
+
+
+avg_values_mods <- right_join(select(climate_modeling_annual_na.omit, c('plot', 'mean_T', 'sensor', 'DAP_Canopy_Height_r15m')), avg_values)
 ##Create_Average Models for plotting 
 soil_annual_lm_n1b_avg <- lmer(mean_T ~ DAP_Canopy_Height_r15m  + aspect.r15m_con_avg
-                               + (1|plot), data = filter(avg_values, sensor == "T1"))
+                               + (1|plot), data = filter(avg_values_mods, sensor == "T1"))
 
 surface_annual_lm_avg <- lmer(mean_T ~ DAP_Canopy_Height_r15m + aspect.r15m_con_avg+ elevation.r15m_con_avg+ 
                                 (1|plot), data = filter(avg_values, sensor == "T2"))
@@ -449,17 +459,18 @@ predictions <- data.frame(rbind(
   cbind(predict(soil_annual_lm_n1b_avg), rep("T1", length(predict(soil_annual_lm_n1b_avg)))),
   cbind(predict(surface_annual_lm_avg), rep("T2", length(predict(surface_annual_lm_avg)))), 
   cbind(predict(near_surface_annual_lm_avg), rep("T3", length(predict(near_surface_annual_lm_avg))))))
+
 names(predictions) <- c('predictions', 'sensor')
 predictions$sensor <- as.factor(predictions$sensor)
-avg_values$predictions <- predictions$predictions  
-avg_values_predictions <- avg_values %>%  mutate(plot = as.factor(plot), 
+avg_values_mods$predictions <- predictions$predictions  
+avg_values_predictions <- avg_values_mods %>%  mutate(plot = as.factor(plot), 
          predictions = as.numeric(predictions))
 
 
 
-canopy_soil_annual <- ggplot(avg_values_predictions , aes(group = plot)) + 
+canopy_soil_annual <- ggplot(avg_values_predictions, aes(group = plot)) + 
   geom_point(aes(DAP_Canopy_Height_r15m, mean_T, color = plot)) + 
-  geom_line(aes(DAP_Canopy_Height_r15m, predictions, color = plot)) + 
+  geom_line(aes(DAP_Canopy_Height_r15m, predictions)) + 
   ylab("Mean Soil Temperature °C") + 
   labs(color = "Plot") +
   xlab("Mean Canopy Height (m)")+
@@ -468,6 +479,7 @@ canopy_soil_annual <- ggplot(avg_values_predictions , aes(group = plot)) +
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   theme_bw(base_size = 15) #+ theme(legend.position = "none")
+canopy_soil_annual
 elevation_soil_annual <- ggplot(soil_temp_avgs, aes(group = plot)) + 
   geom_point(aes(elevation_r15m, mean_T, color = plot)) + 
   geom_line(aes(elevation_r15m, Elev_mod_r15m, color = plot)) + 
