@@ -135,3 +135,101 @@ library(foreach)
   
 write.csv(data, "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Model_Inputs/canopy_metrics.csv")
 
+###### Creating a raster polygon that is clipped to the cropped data
+library(raster)
+#load buffer area 
+plot_buffer <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Site_Buffer_14Jan2020.shp")
+
+#create canopy height mask 
+chm_mask <- raster::mask(chm_raster, plot_buffer)
+plot(chm_mask)
+
+cov_mask <- raster::mask(canopy_cover_raster, plot_buffer)
+
+
+#load fire severity data 
+#fire <- raster::raster("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Fire_Severity_Shapes/New Folder/dnbr.tif")
+fire <- raster::raster("D:/Data/SmithTripp/Gavin_Lake/3D_models/Las_Catalog/fire_severity_dnbr.tif")
+proj4string(fire) <- proj4string(plot_buffer)
+values(fire)[values(fire) < 0] <- 0
+fire_mask <- raster::mask(fire, plot_buffer)
+extent(fire_mask) <- extent(chm_mask)
+plot(fire_mask, add = T)
+
+fire_poly <- rasterToPolygons(fire_mask, na.rm = F, dissolve = T)
+base::plot(fire_poly, col = rainbow)
+
+chm_mask_projected <- projectRaster(chm_mask, fire_mask)
+
+
+chm_res_r <-  chm_mask  %>% 
+  #aggregate(4) %>% 
+  resample(fire)
+
+cov_res_r <- aggregate(cov_mask, 4) %>% 
+  resample(fire_mask)
+
+  fire_res_r <- resample(fire_mask, chm_mask)
+
+
+# Stack covariates
+fire_chm_s <- stack(fire_mask, chm_res_r)
+chm_fire_s <- stack(fire_res_r, chm_mask)
+fire_cov_s <- stack(fire_mask, cov_res_r)
+
+names(fire_chm_s) <- c("fire_sev", "canopy_ht_m")
+names(chm_fire_s) <- c("fire_sev", "canopy_ht_mt")
+names(fire_cov_s) <- c("fire_sev", "canopy_cov_per")
+
+# Correlation between layers
+cor(values(fire_chm_s)[,1],
+    values(fire_chm_s)[,2],
+    use = "na.or.complete")
+cor(values(chm_fire_s)[,1],
+    values(chm_fire_s)[,2],
+    use = "na.or.complete")
+cor(values(fire_cov_s)[,1],
+    values(fire_cov_s)[,2],
+    use = "na.or.complete")
+
+data_comp <- as.data.frame(cbind(values(fire_chm_s)[,1], values(fire_chm_s)[,2]))
+data_comp_chm <- as.data.frame(cbind(values(chm_fire_s)[,1], values(chm_fire_s)[,2]))
+data_comp_cov <- as.data.frame(cbind(values(fire_cov_s)[,1], values(fire_cov_s)[,2]))
+names(data_comp) <- c("fire_sev", "canopy_ht_m")
+names(data_comp_chm) <- c("fire_sev","canopy_ht_m")
+names(data_comp_cov) <- c("fire_sev","canopy_cov_per")
+
+lm1 <- lm(canopy_ht_m ~ fire_sev, data = data_comp_chm)
+lm2 <- lm(canopy_cov_per ~ fire_sev, data = data_comp_cov)
+
+ggplot(data_comp, aes(fire_sev, canopy_ht_m)) + geom_point()
+ggplot(data_comp_cov, aes(fire_sev, canopy_cov_per)) + geom_point()
+
+
+## for each microclimate location 
+
+length <- 1
+cl <- parallel::makeCluster(detectCores())
+doParallel::registerDoParallel(cl)
+chm_extract <- foreach::foreach(length = length,
+                        .combine = cbind, .packages = 'raster') %dopar% 
+  extract(chm_mask, microclimate_locations, buffer = 15, fun = mean, stringAsFactors = F)
+fire_extract <- foreach::foreach(length = length,
+                                .combine = cbind, .packages = 'raster') %dopar% 
+  extract(fire_mask, microclimate_locations, fun = mean, buffer = 15, stringAsFactors = F)
+
+
+parallel::stopCluster(cl)
+
+logger_data_comp <- as.data.frame(cbind(fire_extract, chm_extract))
+names(logger_data_comp) <- c("fire_sev","canopy_ht_m")
+ggplot(logger_data_comp, aes(fire_sev^0.5, canopy_ht_m)) + geom_point()
+logger_data_comp$fire_sev_sqrt <- logger_data_comp$fire_sev ^ 0.5
+lm3 <-  lm(canopy_ht_m ~ fire_sev_sqrt, logger_data_comp)
+
+chm_canopy_zones <- raster::extract(chm_mask, fire_poly, fun = mean)
+
+
+chm_mask_new <- raster::raster(vals=values(chm_mask),ext=extent(fire_mask),crs=crs(fire_mask),
+                     nrows=dim(fire_mask)[1],ncols=dim(fire_mask)[2])
+
