@@ -153,7 +153,8 @@ fire <- raster::raster("D:/Data/SmithTripp/Gavin_Lake/3D_models/Las_Catalog/fire
 proj4string(fire) <- proj4string(plot_buffer)
 values(fire)[values(fire) < 0] <- 0
 fire_mask <- raster::mask(fire, plot_buffer)
-extent(fire_mask) <- extent(chm_mask)
+
+extent(fire) <- extent(chm_mask)
 plot(fire_mask, add = T)
 
 fire_poly <- rasterToPolygons(fire_mask, na.rm = F, dissolve = T)
@@ -164,7 +165,7 @@ chm_mask_projected <- projectRaster(chm_mask, fire_mask)
 
 chm_res_r <-  chm_mask  %>% 
   #aggregate(4) %>% 
-  resample(fire)
+  resample(fire_mask)
 
 cov_res_r <- aggregate(cov_mask, 4) %>% 
   resample(fire_mask)
@@ -173,7 +174,7 @@ cov_res_r <- aggregate(cov_mask, 4) %>%
 
 
 # Stack covariates
-fire_chm_s <- stack(fire_mask, chm_res_r)
+fire_chm_s <- stack(fire, chm_res_r)
 chm_fire_s <- stack(fire_res_r, chm_mask)
 fire_cov_s <- stack(fire_mask, cov_res_r)
 
@@ -199,7 +200,7 @@ names(data_comp) <- c("fire_sev", "canopy_ht_m")
 names(data_comp_chm) <- c("fire_sev","canopy_ht_m")
 names(data_comp_cov) <- c("fire_sev","canopy_cov_per")
 
-lm1 <- lm(canopy_ht_m ~ fire_sev, data = data_comp_chm)
+lm1 <- lm(canopy_ht_m ~ fire_sev, data = data_comp_chm,na.exclude)
 lm2 <- lm(canopy_cov_per ~ fire_sev, data = data_comp_cov)
 
 ggplot(data_comp, aes(fire_sev, canopy_ht_m)) + geom_point()
