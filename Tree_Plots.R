@@ -8,9 +8,12 @@ library(ggplot2)
 library(reshape2)
 library(rgeos)
 library(rgdal)
+
 library(raster)
+
 library(dplyr)
 library(readxl)
+
 library(cowplot)
 
 ##write function to convert polar to cartesian 
@@ -68,6 +71,7 @@ View(trees_plots)
 
 trees_cart <- polar2cart(trees_plots)
 trees_cart$Plot <- as.factor(trees_cart$Plot)
+
 
 ##explore the data 
 length(unique(trees$Plot))
@@ -249,6 +253,7 @@ CHM_mean_height <- clean_naming(CHM_mean_height)
 
 
 CHM_max_field <- merge(CHM_max_height, summary_trees, by = "Plot")
+
 levels(CHM_max_field$plot_num) 
 CHM_mean_field <- merge(CHM_mean_height, summary_trees, by = "Plot")
 levels(CHM_mean_field$plot_num)
@@ -258,31 +263,30 @@ CHM_field_2m <- merge(CHM_max_height_2m, summary_trees, by = "Plot")
 ## plot the derived data
 library(ggplot2)
 max_plot <- ggplot(CHM_max_field@data, aes(x=chm_2m_10cmres+1.2, y = fieldhtmax_trees)) +
-  geom_point( aes(color = plot_num), size = 3) + 
+  geom_point(size = 3) + 
   ylab("Maximum Measured Height (m)") +
   xlab("Maximum DAP Height (m)")+
   xlim(0,35) + 
   ylim(0,35) + 
   stat_smooth(method = "lm", formula = y~ x) + 
   geom_abline(intercept = 0, slope=1) +
-  ggthemes::scale_color_tableau(palette = "Classic Cyclic", na.value = T, drop = F) +
-  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
+  #ggthemes::scale_color_tableau(palette = "Classic Cyclic", na.value = T, drop = F) +
+  #ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
   guides(color = F) + 
-  cowplot::theme_cowplot() 
-  ggtitle("Max DAP vs. Field Ht (m)") +
+  cowplot::theme_cowplot() + 
+  ggtitle("Max DAP vs. Field Ht (m)") 
 mean_plot <- ggplot(as.data.frame(CHM_mean_field), aes(x=chm_2m_10cmres+1.2, y = fieldhtmean_trees)) +
-  geom_point(aes(color = as.factor(plot_num)), size = 3) +
+  geom_point( size = 3) +
   stat_smooth(method = "lm") +
   ylab("Mean measured height (m)") +
   xlab("Mean DAP Height (m)")+
   xlim(0,35) + 
   ylim(0,35) +
   geom_abline(intercept = 0, slope=1) + 
-  ggthemes::scale_color_tableau(palette = "Classic Cyclic", na.value = T, drop = F) +
+  #ggthemes::scale_color_tableau(palette = "Classic Cyclic", na.value = T, drop = F) +
   #ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + 
   labs(color = "Plot") + 
-  cowplot::theme_cowplot() +
-  ggtitle("Mean DAP vs. Field Ht")
+  cowplot::theme_cowplot() + ggtitle(c("Mean DAP vs. Field Ht"))
 
 
 save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/HeightVerification_Plots.jpg',

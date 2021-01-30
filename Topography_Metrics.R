@@ -28,7 +28,7 @@ raster::plot(microclimate_locations, add = T)
 #write sequence to name for numbers 
 plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
 seq <- seq(from =1 , to = 10, by = 1)
-fs_seq <- paste0("fs", seq)
+fs_seq <- paste0(seq)
 fire <- which(grepl("fire", names(plots@data)))
 plot <- which(grepl("plot", names(plots@data)))
 grabber_cols <- c(fire, plot)
@@ -71,10 +71,10 @@ microclimate_locations@data <- fix_errors(microclimate_locations@data)
 
 microclimate_locations@data <- microclimate_locations@data %>%
   mutate(plot_point = paste0(plot_num, point))
-sub <- filter(microclimate_locations@data, plot_point == "fs107")
-sub[2,c("plot_point")] <- "fs108"
+sub <- filter(microclimate_locations@data, plot_point == "107")
+sub[2,c("plot_point")] <- "108"
 
-microclimate_locations@data <- microclimate_locations@data %>% filter(plot_point != "fs107")
+microclimate_locations@data <- microclimate_locations@data %>% filter(plot_point != "107")
 microclimate_locations@data <- rbind(microclimate_locations@data, sub)
 
 microclimate_locations@data[,c("field_1", "plot", "point", "path", "layer", "z_DEM", "time", "FID", "name")] <- list(NULL)
@@ -102,7 +102,7 @@ library(foreach)
 ## process for topography metrics (taken out of function because not working)
   names <- c("plot_point", paste0("elevation_r", radii, "m"), paste0("aspect r", radii, "m"), paste0("slope r", radii,"m"), paste("TRI r", radii, "m"), paste("Sol_rad r", radii, "m"))
   length <- length(microclimate_locations$plot_point)
-  
+                                                                                                                                                                      
   cl <- parallel::makeCluster(detectCores())
   doParallel::registerDoParallel(cl)
   

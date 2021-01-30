@@ -275,14 +275,14 @@ dim(sm_data_soils)
 # Drop times that have duplicate measurements  ----------------------------
 count_measures <- sm_data_soils %>% 
   group_by(DateTime_GMT, Plotcode) %>% count() %>% 
-  filter(n > 1) %>% 
+  filter(n > 2) %>% 
   left_join(sm_data_soils) 
   #distinct()
 
 data_without_double_coundts <- sm_data_soils %>% filter(!FID %in% count_measures$FID)
 
 count_measures_distinct <- count_measures %>% dplyr::select(-c(FID)) %>% distinct() %>% group_by(DateTime_GMT, Plotcode) %>% count() %>% 
-  filter(n>1) %>%
+  filter(n>2) %>%
   left_join(sm_data_soils) #%>% 
   #filter(T1 < 40 & T1 > -10 & T2 < 40 & T2 > -10 & T3 < 55 & T3 > -15)
 graph <- ggplot(filter(count_measures_distinct)) + #, Plotcode == "CA_ST_fs88")) + 
