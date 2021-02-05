@@ -801,15 +801,23 @@ soil_dat <- climate_modeling_month %>% filter(sensor == "T1") %>% subset(!is.na(
 monthly_mods <- function(data, sensor, variable) {
   q <- which(grepl(paste0(sensor), data$sensor))
   data_sensor <- data[q,]
-  var <- which(grepl(variable, names(data_sensor)))
-  names(data_sensor[, var]) <- "variable"
   months <- split(data_sensor, f = data_sensor$month)
+  if(variable == "mean"){
   m5 <- lmer(mean_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'5')
   m6 <- lmer(mean_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'6')
   m7 <- lmer(mean_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'7')
   m8 <- lmer(mean_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'8')
   m9 <- lmer(mean_T~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'9')
-  return(list(m5,m6,m7,m8,m9))
+  out <- list(m5,m6,m7,m8,m9)
+  }
+else if (variable == "range") {
+  m5 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'5')
+  m6 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'6')
+  m7 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'7')
+  m8 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'8')
+  m9 <- lmer(range_T~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'9')
+  out <- list(m5,m6,m7,m8,m9) 
+}
 }
 
 get_slope <- function(model) { 
@@ -829,24 +837,32 @@ get_slope <- function(model) {
   return(model_details)
 }
 
-soil_month_models <- monthly_mods(climate_modeling_month, sensor = "T1", variable = "mean_T")
-soil_coeff <- lapply(soil_month_models, get_slope) 
-soil_radj <-lapply(soil_month_models, MuMIn::r.squaredGLMM)
 get_fixed <- function(mumin_list) {
   fixed <- mumin_list[2]
   return(fixed)
 }
-soil_radj_fixed <- data.frame(t(rbind(month = c('5','6', '7', '8','9'), 
-                              r_fixed = bind_cols(lapply(soil_radj, get_fixed)))))
 
-soil_coeff_df <- bind_rows(soil_coeff) %>% pivot_wider(names_from = coeff, values_from = Estimate) %>% 
-  left_join(soil_radj_fixed)
+mods_coeff_function <- function(data, sensor, variable, class_name){
+  model_list <- monthly_mods(data, sensor = sensor, variable = variable)
+  model_coeff <- lapply(model_list, get_slope) 
+  model_radj <-lapply(model_list, MuMIn::r.squaredGLMM)
+  model_fixed <- data.frame(t(rbind(month = c('5','6', '7', '8','9'), 
+                                        r_fixed = bind_cols(lapply(model_radj, get_fixed)))))
+  
+  model_coeff_df <- bind_rows(model_coeff) %>% pivot_wider(names_from = coeff, values_from = Estimate) %>% 
+    left_join(model_fixed)
+  
+  model_coeff_df$Estimate_all <-apply(model_coeff_df[, c("(Intercept)", "DAP_Canopy_Height_r15m", "Elevation", "aspect.r10m_con")], 1,
+                                     function(i){ paste(na.omit(i), collapse = " ") })
+  model_coeff_df$Estimate_all <- as.numeric(model_coeff_df$Estimate_all)
+  
+  model_coeff_df$class <- paste(class_name)
+  return(model_coeff_df)
+}
 
-soil_coeff_df$Estimate_all <-apply(soil_coeff_df[, c("(Intercept)", "DAP_Canopy_Height_r15m", "Elevation", "aspect.r10m_con")], 1,
-                                   function(i){ paste(na.omit(i), collapse = " ") })
-soil_coeff_df$Estimate_all <- as.numeric(soil_coeff_df$Estimate_all)
+soil_coeff_df <- mods_coeff_function(climate_modeling_month, sensor = "T1", variable = "mean", class_name = "Soil °C")
+soil_coeff_df_range <- mods_coeff_function(climate_modeling_month, sensor = "T1", variable = "range", class_name = "Soil °C")
 
-soil_coeff_df$class <- "Soil °C"
 soil <- ggplot(soil_coeff_df) + 
   geom_point(aes(month, Estimate_all, color = month), size = 3) +geom_line(aes(month, Conf_Estimate, color = model), size = 1.5, linetype = "dotted") + 
   ylab("Confidence Interval for Model Estimate") + 
@@ -858,21 +874,9 @@ soil <- ggplot(soil_coeff_df) +
   theme_bw(base_size = 20) + theme(legend.position = "none")
 
 # Surface Monthly Temperature -----------------------------------------------------
+surface_coeff_df <- mods_coeff_function(climate_modeling_month, sensor = "T2", variable = "mean", class_name = "Surface °C")
+surface_coeff_df_range <- mods_coeff_function(climate_modeling_month, sensor = "T2", variable = "range", class_name = "Surface °C")
 
-surface_month_models <- monthly_mods(climate_modeling_month, sensor = "T2", variable = "mean_T")
-surface_coeff <- lapply(surface_month_models, get_slope)
-surface_radj <-lapply(surface_month_models, MuMIn::r.squaredGLMM)
-
-surface_radj_fixed <- data.frame(t(rbind(month = c('5','6', '7', '8','9'), 
-                                      r_fixed = bind_cols(lapply(surface_radj, get_fixed)))))
-surface_coeff_df <- bind_rows(surface_coeff) %>% pivot_wider(names_from = coeff, values_from = Estimate) %>% 
-  left_join(surface_radj_fixed)
-
-surface_coeff_df$Estimate_all <-apply(surface_coeff_df[, c("(Intercept)", "DAP_Canopy_Height_r15m", "Elevation", "aspect.r10m_con")], 1,
-                                   function(i){ paste(na.omit(i), collapse = " ") })
-surface_coeff_df$Estimate_all <- as.numeric(surface_coeff_df$Estimate_all)
-
-surface_coeff_df$class <- "Surface °C"
 surface <- ggplot(surface_coeff_df) + 
   geom_point(aes(month, Estimate_all, color = month), size = 3) +geom_line(aes(month, Conf_Estimate, color = model), size = 1.5, linetype = "dotted") + 
   ylab("Confidence Interval for Model Estimate") +
@@ -883,22 +887,9 @@ geom_text(aes(month, Estimate_all, label = round(Estimate_all,2)), nudge_x = 0.3
   theme_bw(base_size = 20) + theme(legend.position = "none")
 
 # Near Surface Monthly Temperature ----------------------------------------
+near_surface_coeff_df <- mods_coeff_function(climate_modeling_month, sensor = "T3", variable = "mean", class_name = "Near-Surface °C")
+near_surface_coeff_df_range <- mods_coeff_function(climate_modeling_month, sensor = "T3", variable = "range", class_name = "near-Surface °C")
 
-near_surface_month_models <- monthly_mods(climate_modeling_month, sensor = "T3", variable = "mean_T")
-hist((climate_modeling_month %>% filter(sensor == "T3" & month == "7"))$mean_T)
-near_surface_coeff <- lapply(near_surface_month_models, get_slope) 
-near_surface_radj <-lapply(near_surface_month_models, MuMIn::r.squaredGLMM)
-
-near_surface_radj_fixed <- data.frame(t(rbind(month = c('5','6', '7', '8','9'), 
-                                         r_fixed = bind_cols(lapply(near_surface_radj, get_fixed)))))
-near_surface_coeff_df <- bind_rows(near_surface_coeff) %>% pivot_wider(names_from = coeff, values_from = Estimate) %>% 
-  left_join(near_surface_radj_fixed)
-
-near_surface_coeff_df$Estimate_all <-apply(near_surface_coeff_df[, c("(Intercept)", "DAP_Canopy_Height_r15m", "Elevation", "aspect.r10m_con")], 1,
-                                      function(i){ paste(na.omit(i), collapse = " ") })
-near_surface_coeff_df$Estimate_all <- as.numeric(near_surface_coeff_df$Estimate_all)
-near_surface_coeff_df$model_type <- "near_surface"
-near_surface_coeff_df$class <- "Near Surface °C"
 near_surface <- ggplot(near_surface_coeff_df) + 
   geom_point(aes(month, Estimate_all, color = month), size = 3) + geom_line(aes(month, Conf_Estimate, color = model), size = 1.5, linetype = "dotted") + 
   ylab("Confidence Interval for Model Estimate") + xlab("") + labs(color = "Month") +
@@ -913,8 +904,6 @@ near_surface <- ggplot(near_surface_coeff_df) +
 monthly_mods_moist <- function(data, sensor, variable, scaled) {
   q <- which(grepl(paste0(sensor), data$sensor))
   data_sensor <- data[q,]
-  var <- which(grepl(variable, names(data_sensor)))
-  names(data_sensor[, var]) <- "variable"
 
   if(scaled == T) { # build models from z scores of the data rather than actual data itself 
     data_scaled <- data.frame(data_sensor, scale(data_sensor$Elevation), scale(data_sensor$DAP_Canopy_Height_r2m), scale(data_sensor$aspect.r10m_con))
@@ -922,48 +911,57 @@ monthly_mods_moist <- function(data, sensor, variable, scaled) {
     data_scaled$elevation_r5m <- data_scaled$scale.data_sensor.Elevation ## change to elevation here 
     data_scaled$aspect.r10m_con <- data_scaled$scale.data_sensor.aspect.r10m_con.                         
     months <- split(data_scaled, f = data_scaled$month)
-    m5 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'5')
-    m6 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'6')
-    m7 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'7')
-    m8 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'8')
-    m9 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'9')
+    m5 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'5')
+    m6 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'6')
+    m7 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'7')
+    m8 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'8')
+    m9 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'9')
     store_mods <- list(m5,m6,m7,m8,m9)
   }
 else {
+  if(variable == "mean"){
   months <- split(data_sensor, f = data_sensor$month)
-  m5 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'5')
-  m6 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'6')
-  m7 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'7')
-  m8 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'8')
-  m9 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + elevation_r5m + aspect.r10m_con + (1|plot), data = months$'9')
-  store_mods <- list(m5,m6,m7,m8,m9)
+  m5 <- lmer(mean_sm ~DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'5')
+  m6 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'6')
+  m7 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'7')
+  m8 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'8')
+  m9 <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'9')
+  store_mods <- list(m5,m6,m7,m8,m9) }
+  else if (variable == "range"){
+    months <- split(data_sensor, f = data_sensor$month)
+    m5 <- lmer(range_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'5')
+    m6 <- lmer(range_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'6')
+    m7 <- lmer(range_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'7')
+    m8 <- lmer(range_sm ~ DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'8')
+    m9 <- lmer(range_sm ~DAP_Canopy_Height_r2m + Elevation + aspect.r10m_con + (1|plot), data = months$'9')
+    store_mods <- list(m5,m6,m7,m8,m9) }
 }
 }
-
-soil_moist_month_models <- monthly_mods_moist(climate_modeling_month, sensor = "T1", variable = "mean_sm", scaled = F)
-for(i in 1:length(soil_moist_month_models)) {
-  print(i)
-  print(plot(soil_moist_month_models[[i]]))
-}
-
-soil_moist_coeff <- lapply(soil_moist_month_models, get_slope) 
-soil_moist_radj <-lapply(soil_moist_month_models, MuMIn::r.squaredGLMM)
-
-soil_moist_radj_fixed <- data.frame(t(rbind(month = c('5','6', '7', '8','9'), 
-                                              r_fixed = bind_cols(lapply(soil_moist_radj, get_fixed)))))
-soil_moist_coeff_df <- bind_rows(soil_moist_coeff) %>% pivot_wider(names_from = coeff, values_from = Estimate) %>% 
-  left_join(soil_moist_radj_fixed)
-
-m7 <- lmer(mean_sm ~ DAP_Canopy_Height_r5m + (1|plot), data = filter(climate_modeling_month, sensor == "T1" & month == "5"))
-
-ggplot(climate_modeling_month %>% filter(month == "7"), aes(DAP_Canopy_Height_r5m, mean_sm)) + 
-  geom_point() +
-   stat_smooth(method = "lm")
-
-soil_moist_coeff_df$Estimate_all <-apply(soil_moist_coeff_df[, c("(Intercept)", "DAP_Canopy_Height_r5m", "aspect.r10m_con", "elevation_r5m")], 1,
+mods_coeff_function_moist<- function(data, sensor, variable, class_name,scaled){
+  model_list <- monthly_mods_moist(data, sensor = sensor, variable = variable, scaled)
+  model_coeff <- lapply(model_list, get_slope) 
+  model_radj <-lapply(model_list, MuMIn::r.squaredGLMM)
+  model_fixed <- data.frame(t(rbind(month = c('5','6', '7', '8','9'), 
+                                    r_fixed = bind_cols(lapply(model_radj, get_fixed)))))
+  
+  model_coeff_df <- bind_rows(model_coeff) %>% pivot_wider(names_from = coeff, values_from = Estimate) %>% 
+    left_join(model_fixed)
+  
+  model_coeff_df$Estimate_all <-apply(model_coeff_df[, c("(Intercept)", "DAP_Canopy_Height_r2m", "Elevation", "aspect.r10m_con")], 1,
                                       function(i){ paste(na.omit(i), collapse = " ") })
-soil_moist_coeff_df$Estimate_all <- as.numeric(soil_moist_coeff_df$Estimate_all)
-soil_moist_coeff_df$class <- "Soil Moisture vol %"
+  model_coeff_df$Estimate_all <- as.numeric(model_coeff_df$Estimate_all)
+  
+  model_coeff_df$class <- paste(class_name)
+  return(model_coeff_df)
+}
+soil_moist_coeff_df <- mods_coeff_function_moist(climate_modeling_month, sensor = "T2", variable = "mean", class_name =  "Soil Moisture vol %",
+                                              scaled = F)
+soil_moist_coeff_df_range <- mods_coeff_function_moist(climate_modeling_month, sensor = "T2", variable = "range", class_name =  "Soil Moisture vol %",
+                                              scaled = F)
+
+
+
+
 
 soil_moist <- ggplot(soil_moist_coeff_df) + 
   geom_point(aes(month, Estimate_all, color = month), size = 3) +geom_line(aes(month, Conf_Estimate, color = model), size = 1.5, linetype = "dotted") + 
@@ -975,10 +973,10 @@ soil_moist <- ggplot(soil_moist_coeff_df) +
   theme_bw(base_size = 20) + theme(legend.position = "none",axis.title.x=element_blank(),
                                    axis.text.x=element_blank(),
                                    axis.ticks.x=element_blank())
-DAP_data <- soil_moist_coeff_df %>% subset(!is.na(DAP_Canopy_Height_r15m)) %>% 
-  select(c("month", "Conf_Estimate", "DAP_Canopy_Height_r15m", "variable"))
+DAP_data <- soil_moist_coeff_df %>% subset(!is.na(DAP_Canopy_Height_r2m)) %>% 
+  select(c("month", "Conf_Estimate", "DAP_Canopy_Height_r2m", "variable"))
 ggplot(DAP_data, aes(color = month)) + 
-         geom_point(aes(month, DAP_Canopy_Height_r15m)) + 
+         geom_point(aes(month, DAP_Canopy_Height_r2m)) + 
   geom_line(aes(month, Conf_Estimate)) + 
   ylab("Confidence Interval for Model Estimate") + xlab("") + labs(color = "Month") +
   #scale_color_brewer(palette = "Dark2") + ylim(-0.01, 0.01) +
@@ -990,7 +988,7 @@ ggplot(DAP_data, aes(color = month)) +
 
 
 # DAP Slope by Month  -----------------------------------------------------
-all_month_models_DAP <- full_join(subset(soil_moist_coeff_df, !is.na(DAP_Canopy_Height_r5m)), 
+all_month_models_DAP <- full_join(subset(soil_moist_coeff_df, !is.na(DAP_Canopy_Height_r2m)), 
                                   subset(soil_coeff_df, !is.na(DAP_Canopy_Height_r15m))) %>%
   full_join(subset(surface_coeff_df, !is.na(DAP_Canopy_Height_r15m))) %>%  full_join(subset(near_surface_coeff_df, !is.na(DAP_Canopy_Height_r15m))) %>% 
   mutate(month_ = lubridate::month(lubridate::as_date(case_when(month == "5" ~ "05/01/2021", 
@@ -1008,14 +1006,35 @@ DAP_models_by_month <- ggplot(all_month_models_DAP) +
   geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
   scale_color_brewer(palette = "Dark2") + xlab("") +
   facet_wrap(~class_, scales = "free")+ #ylim(c(-0.29, 0.019)) +
-  ggtitle("Estimates for Canopy Height (m) as a fixed effect") +
+  ggtitle("Estimates for Canopy Height (m) as a fixed effect on Mean Value") +
   geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
   theme_bw(base_size = 20) + theme(legend.position = "bottom")
 DAP_models_by_month
 
+all_month_range_DAP <- full_join(subset(soil_moist_coeff_df_range, !is.na(DAP_Canopy_Height_r2m)), 
+                                 subset(soil_coeff_df_range, !is.na(DAP_Canopy_Height_r15m))) %>%
+  full_join(subset(surface_coeff_df_range, !is.na(DAP_Canopy_Height_r15m))) %>%  full_join(subset(near_surface_coeff_df_range, !is.na(DAP_Canopy_Height_r15m))) %>% 
+  mutate(month_ = lubridate::month(lubridate::as_date(case_when(month == "5" ~ "05/01/2021", 
+                                                                month == "6" ~ "06/01/2021", 
+                                                                month == "7" ~ "07/01/2021", 
+                                                                month == "8" ~ "08/01/2021", 
+                                                                month == "9" ~ "09/01/2021"), format = "%m/%d/%y"), label = T), 
+         r_fixed = as.numeric(r_fixed), 
+         class_ = as.factor(class), 
+         class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3)) 
 
+DAP_models_by_month_range <- ggplot(all_month_range_DAP) + 
+  geom_point(aes(month_, Estimate_all), size = 3) +geom_line(aes(month_, Conf_Estimate), size = 1) + 
+  ylab("Confidence Interval and Estimate for Model") + 
+  geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
+  scale_color_brewer(palette = "Dark2") + xlab("") +
+  facet_wrap(~class_, scales = "free")+ #ylim(c(-0.29, 0.019)) +
+  ggtitle("Estimates for Canopy Height (m) as a fixed effect on Mean Range") +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
+  theme_bw(base_size = 20) + theme(legend.position = "bottom")
+DAP_models_by_month_range
 ##facet_grid of all models for SI 
-all_month_models <- full_join(soil_moist_coeff_df, soil_coeff_df) %>%
+all_month_models_range <- full_join(soil_moist_coeff_df, soil_coeff_df) %>%
   full_join(surface_coeff_df) %>%  full_join(near_surface_coeff_df) %>% 
   mutate(variable_simp = case_when(variable == "DAP_Canopy_Height_r5m" | variable == "DAP_Canopy_Height_r15m" ~ "Canopy Height",
                                    variable == "elevation_r5m" | variable == "Elevation" ~ "Elevation", 
