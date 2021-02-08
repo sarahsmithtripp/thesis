@@ -74,7 +74,8 @@ climate_sums <- climate_data_fix %>% mutate(yday = lubridate::yday(DateTime_GMT)
                                           "Near-Surface (+15 cm)" = mean(max_daily_T3, na.rm = T)) %>% 
   pivot_longer(cols = contains("cm"), names_to = "Temp_Sensor", values_to = "Mean_max_m") %>%
   left_join(meta_data[,c("Plotcode", "plot")])
-Temperature_plots <- ggplot(climate_sums %>% filter(Temp_Sensor %in% c("Soil (-8 cm)", "Near-Surface (+15 cm)")), aes(month, Mean_max_m, group = month))+ 
+Temperature_plots <- ggplot(climate_sums %>% filter(Temp_Sensor %in% c("Soil (-8 cm)", "Near-Surface (+15 cm)")),
+                            aes(month, Mean_max_m, group = month)) + 
   geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
   geom_point(aes(color = as.factor(plot)), alpha = 0.4, position = 'jitter', size = 1)+
   facet_wrap(~Temp_Sensor, ncol = 2) +
@@ -165,9 +166,9 @@ climate_modeling_annual <- climate_data_fix %>%
          range_sm = max(vol_sm, na.rm = T) - min(vol_sm, na.rm = T) ) %>%
   pivot_longer(cols = c("T1", "T2", "T3"), names_to = 'sensor', values_to = 'Temp_C') %>% 
   group_by(Plotcode, sensor, DateTime) %>% 
-  mutate(range_d = max(Temp_C) - min(Temp_C), 
-         min_d = min(Temp_C), 
-         max_d = max(Temp_C))%>% 
+  mutate(min_d = min(Temp_C), 
+         max_d = max(Temp_C), 
+         range_d = (max_d - min_d))%>% 
   group_by(Plotcode, sensor) %>% 
   summarise(mean_sm = mean(mean_sm, na.rm = T), 
             range_sm = mean(range_sm, na.rm = T),
@@ -177,6 +178,13 @@ climate_modeling_annual <- climate_data_fix %>%
             min_T = mean(min_d, na.rm = T), 
             mean_T = mean(Temp_C, na.rm = T)) %>% 
   left_join(meta_data, by = 'Plotcode')
+data_check <- filter(climate_modeling_annual, range_T > 18) %>% right_join(climate_data_fix)
+
+## does not look erroneous 
+check_graph <- ggplot(data_check, aes(DateTime_GMT, T3, group = Plotcode)) + 
+  geom_line()
+
+
 climate_modeling_Ht_long <-climate_modeling_annual %>% pivot_longer(cols = contains("Dap_Canopy_Height"), names_to ="Canopy_Radius", values_to = "Mean_Canopy_Height") 
 ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Height_r2m", "DAP_Canopy_Height_r15m")),
        aes(Mean_Canopy_Height,mean_T)) + 
@@ -433,8 +441,8 @@ summary(soil_annual_lm)
 soil_range_annual_anova  <- annual_model_function("range_T", "T1", climate_modeling_annual, temp = T, transform = T)
 soil_range_annual_anova
 
-## Best model is model n1a
-soil_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + Elevation + (1|plot), 
+## Best model is model n2
+soil_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T1"))
 
 # Surface Models  ---------------------------------------------------------
@@ -492,7 +500,7 @@ MuMIn::r.squaredGLMM(soil_annual_lm)
 near_surface_range_annual_anova  <- annual_model_function("range_T", "T3", climate_modeling_annual, temp = T, transform = T)
 near_surface_range_annual_anova
 
-## Best model is model 2
+## Best model is model 3
 near_surface_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), 
                                 data = filter(climate_modeling_annual, sensor == "T3"))
 MuMIn::r.squaredGLMM(near_surface_range_annual_lm)
@@ -523,7 +531,7 @@ anova(soil_moist_annual_lm, soil_moist_annual_lm_n1a, soil_moist_annual_lm_n1b, 
 
 MuMIn::r.squaredGLMM(soil_moist_annual_lm)
 
-summary(soil_moist_annual_lm)
+summary(soil_moist_annual_lm_n2)
 
 ## Mean Annual range in temperature 
 soil_moist_range_annual_anova  <- annual_model_function("range_sm", "T3", climate_modeling_annual %>% subset(!is.infinite(range_sm)), temp = F, transform = F)
@@ -538,9 +546,9 @@ plot(soil_moist_range_annual_lm)
 Model_Coefficients_Mean <- data.frame(rbind(summary(soil_annual_lm)$coefficients,
                             summary(surface_annual_lm)$coefficients,
                             summary(near_surface_annual_lm)$coefficients, 
-                            summary(soil_moist_annual_lm)$coefficients))
-Model_Coefficients$variable <- c(rownames(Model_Coefficients))
-View(t(Model_Coefficients))
+                            summary(soil_moist_annual_lm_n2)$coefficients))
+Model_Coefficients_Mean$variable <- c(rownames(Model_Coefficients_Mean))
+View(Model_Coefficients_Mean)
 
 
 Range_Models <- data.frame(rbind(summary(soil_range_annual_lm)$call,
@@ -552,6 +560,7 @@ Model_Coefficients_Range <- data.frame(rbind(summary(soil_range_annual_lm)$coeff
                                              summary(near_surface_range_annual_lm)$coefficients, 
                                              summary(soil_moist_range_annual_lm)$coefficients))
 
+View(Model_Coefficients_Range)
 # Annual Model Graphs  ----------------------------------------------------
 
 #### plot annual soil temperature models 
@@ -680,12 +689,12 @@ full_annual_model_graph
 #range graph 
 #soil temperature 
 soil_temp_range <- model_data(climate_modeling_annual, sensor = "T1", fit_mod =F)
-soil_temp_annual_range_avg <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + elevation_avg + (1|plot), data = soil_temp_range)
+soil_temp_annual_range_avg <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), data = soil_temp_range)
 soil_temp_range <- soil_temp_annual_range_avg@frame
-soil_temp_range$prediction <- as.numeric(predict(soil_temp_annual_range_avg))
+soil_temp_range$prediction <- exp(as.numeric(predict(soil_temp_annual_range_avg)))
 
-soil_temp_range$prediction_nr <- (soil_temp_range$DAP_Canopy_Height_r15m *soil_temp_annual_range_avg@beta[2]) + (unique(avg_values$elevation_avg_nr) * soil_temp_annual_range_avg@beta[3]) + 
-  + (mean(soil_temp_annual_range_avg@u) +soil_temp_annual_range_avg@beta[1])
+soil_temp_range$prediction_nr <- exp((soil_temp_range$DAP_Canopy_Height_r15m *soil_temp_annual_range_avg@beta[2])  + 
+  + (mean(soil_temp_annual_range_avg@u) +soil_temp_annual_range_avg@beta[1]))
 soil_temp_range$sensor <- "T1"
 
 #surface temperature
@@ -693,8 +702,8 @@ surface_temp_range <- model_data(climate_modeling_annual, sensor = "T2", fit_mod
 surface_temp_annual_range_avg <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), data = surface_temp_range)
 surface_temp_range <- surface_temp_annual_range_avg@frame
 #surface_temp_range <- add_column(surface_temp_range, 'elevation_avg', .after = 2) 
-surface_temp_range$prediction <- as.numeric(predict(surface_temp_annual_range_avg))
-surface_temp_range$prediction_nr <- (surface_temp_range$DAP_Canopy_Height_r15m *surface_temp_annual_range_avg@beta[2]) + (mean(surface_temp_annual_range_avg@u) +surface_temp_annual_range_avg@beta[1])
+surface_temp_range$prediction <- exp(as.numeric(predict(surface_temp_annual_range_avg))) # convert out of log units
+surface_temp_range$prediction_nr <- exp((surface_temp_range$DAP_Canopy_Height_r15m *surface_temp_annual_range_avg@beta[2]) + (mean(surface_temp_annual_range_avg@u) +surface_temp_annual_range_avg@beta[1]))
 surface_temp_range$sensor <- "T2"
 
 #near-surface temperature 
@@ -702,8 +711,8 @@ near_surface_temp_range <- model_data(climate_modeling_annual, sensor = "T3", fi
 near_surface_temp_annual_range_avg <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), data = near_surface_temp_range)
 near_surface_temp_range <- near_surface_temp_annual_range_avg@frame # %>% left_join(climate_modeling_annual)
 #near_surface_temp_range <- add_column(near_surface_temp_range, 'elevation_avg', .after = 2) 
-near_surface_temp_range$prediction <- as.numeric(predict(near_surface_temp_annual_range_avg))
-near_surface_temp_range$prediction_nr <- (near_surface_temp_range$DAP_Canopy_Height_r15m *near_surface_temp_annual_range_avg@beta[2]) + (mean(near_surface_temp_annual_range_avg@u) +near_surface_temp_annual_range_avg@beta[1])
+near_surface_temp_range$prediction <- exp(as.numeric(predict(near_surface_temp_annual_range_avg)))
+near_surface_temp_range$prediction_nr <- exp((near_surface_temp_range$DAP_Canopy_Height_r15m *near_surface_temp_annual_range_avg@beta[2]) + (mean(near_surface_temp_annual_range_avg@u) +near_surface_temp_annual_range_avg@beta[1]))
 near_surface_temp_range$sensor <- "T3"
 
 #temperature graphs
@@ -716,7 +725,9 @@ avg_values_predictions_range <- avg_values_predictions_range %>% mutate(plot = a
   mutate(class = as.factor(case_when(sensor == "T1" ~ "Soil",
                                      sensor == "T2" ~ "Surface", 
                                      sensor == "T3" ~ "Near-Surface")), 
-         range_T_log = .$'log(range_T)')
+         range_T = exp(.$'log(range_T)'),
+         class_ = as.factor(class), 
+         class_ = fct_relevel(class_, "Near-Surface", after = 2))
 
 
 levels(avg_values_predictions_range$plot) <- seq(1,10, by =1)
@@ -724,20 +735,21 @@ avg_values_predictions_range$class <- factor(avg_values_predictions_range$class,
 
 #levels(avg_values_predictions$sensor) <- c("Soil", "Surface", "Near-Surface")
 annual_model_graph_range <- ggplot(avg_values_predictions_range) + 
-  geom_point(aes(DAP_Canopy_Height_r15m,range_T_log, color = plot)) + 
+  geom_point(aes(DAP_Canopy_Height_r15m,range_T, color = plot)) + 
   geom_line(aes(DAP_Canopy_Height_r15m, predict, color = plot), alpha = 0.5, size = 1) +
   geom_line(aes(DAP_Canopy_Height_r15m, predict_nr), color = "black" ,size = 2, alpha = 0.7) +
   #geom_line(aes(DAP_Canopy_Height_r15m, lower_nr)) +
   #geom_line(aes(DAP_Canopy_Height_r15m, upper_nr)) +
   xlim(0,25) +
-  ylab("Log(Mean Daily Range in Temperature °C)") + 
+  ylab("Mean Daily Range in Temperature °C") + 
   labs(color = "Plot") +
   xlab("Canopy Height (m)")+
-  facet_wrap(~class, ncol = 1, scales = "free_y" ) +
+  facet_wrap(~class_, ncol = 1, scales = "free_y" ) +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   xlab("") +
+  scale_y_continuous(labels = scales::number_format(accuracy = 1)) +
   theme_bw(base_size = 10) + theme(axis.title.x=element_blank(),
                                    axis.text.x=element_blank(),
                                    axis.ticks.x=element_blank())
@@ -778,6 +790,7 @@ range_plots_stacked <- plot_grid(annual_model_graph_range, sm_annual_range_model
 full_stack <- plot_grid(mean_plots_stacked, range_plots_stacked, legend, rel_widths = c(1,1,0.2), nrow = 1)
 full_stack
 
+
 save_plot(full_stack, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/annual_mods.jpeg", base_height = 11, base_width = 8.5)
 
 # annual range models  ----------------------------------------------------
@@ -793,7 +806,52 @@ climate_modeling_month <- climate_data_fix %>%
             range_sm = mean((max(vol_sm)- min(vol_sm)), na.rm = T),
             range_T = mean((max(Temp_C)- min(Temp_C)), na.rm = T)
             )%>%
-  left_join(meta_data)
+  left_join(meta_data) %>% 
+  filter(!(sensor == "T1" & mean_T > 35)) %>%
+  mutate(variable = case_when(sensor == "T1" ~"Soil °C (-8 cm)", 
+                              sensor == "T2" ~"Surface °C (0 cm)",
+                              sensor == "T3" ~"Near-Surface °C (15 cm)"), 
+         variable_ = factor(variable, levels = c("Soil °C (-8 cm)", "Surface °C (0 cm)", "Near-Surface °C (15 cm)")))
+         # variable_ = fct_relevel(variable_, "Surface °C (0 cm)", after = 1),
+         # variable_ = fct_relevel(variable_, "Near-Surface °C (15 cm)", after = 2))
+
+
+temp <- ggplot(climate_modeling_month,
+       aes(month, mean_T, group = month)) + 
+  geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(aes(color = as.factor(plot)), alpha = 0.7, position = 'jitter', size = 1)+
+  facet_wrap(~variable_, ncol = 1) +
+  ylab("Average Temperature °C") + 
+  labs(color = "Plot") +
+  xlab("")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
+  theme_bw(base_size = 15)
+legend_temp <- get_legend(temp) + theme_bw(base_size = 25)
+temp <- temp +theme(legend.position = "none")
+
+soil_temp_mean <- climate_data_fix %>% group_by(DateTime_GMT) %>% mutate(mean_vol_sm = mean(vol_sm, na.rm = T)) %>% select("DateTime_GMT", "mean_vol_sm", "Plotcode")
+soil_temp_dat <- climate_modeling_month %>% filter(sensor == "T1") %>% mutate(variable = "Soil Moisture Vol %") #%>% right_join(soil_temp_mean)
+
+soil_moist <- ggplot(soil_temp_dat, 
+               aes(month, mean_sm, group = month)) + 
+  geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  #geom_line(aes(unique(DateTime_GMT), unique(mean_vol_sm))) +
+  geom_point(aes(month, mean_sm, color = as.factor(plot)), alpha = 0.7, position = 'jitter', size = 1)+
+  facet_wrap(~variable, ncol = 1) +
+  ylab("Average Soil Moisture % Vol") + 
+  labs(color = "Plot") +
+  xlab("Month")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
+  theme_bw(base_size = 15) + theme(legend.position = "none")
+
+pt1 <- plot_grid(temp, soil_moist, ncol = 1, rel_heights =c(3, 1), rel_widths = c(1.2, 0.8))
+
+stack <- plot_grid(pt1, legend, ncol = 2, rel_widths = c(1, 0.2))
+ggplot(climate_data_fix, aes(DateTime_GMT, vol_sm, color = Plotcode)) + geom_line( size = 0.2)
 
 
 # soil monthly temperature  -----------------------------------------------
@@ -815,7 +873,7 @@ else if (variable == "range") {
   m6 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'6')
   m7 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'7')
   m8 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'8')
-  m9 <- lmer(range_T~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'9')
+  m9 <- lmer(range_T ~ DAP_Canopy_Height_r15m + Elevation + aspect.r10m_con + (1|plot), data = months$'9')
   out <- list(m5,m6,m7,m8,m9) 
 }
 }
@@ -888,7 +946,7 @@ geom_text(aes(month, Estimate_all, label = round(Estimate_all,2)), nudge_x = 0.3
 
 # Near Surface Monthly Temperature ----------------------------------------
 near_surface_coeff_df <- mods_coeff_function(climate_modeling_month, sensor = "T3", variable = "mean", class_name = "Near-Surface °C")
-near_surface_coeff_df_range <- mods_coeff_function(climate_modeling_month, sensor = "T3", variable = "range", class_name = "near-Surface °C")
+near_surface_coeff_df_range <- mods_coeff_function(climate_modeling_month, sensor = "T3", variable = "range", class_name = "Near-Surface °C")
 
 near_surface <- ggplot(near_surface_coeff_df) + 
   geom_point(aes(month, Estimate_all, color = month), size = 3) + geom_line(aes(month, Conf_Estimate, color = model), size = 1.5, linetype = "dotted") + 
@@ -998,7 +1056,8 @@ all_month_models_DAP <- full_join(subset(soil_moist_coeff_df, !is.na(DAP_Canopy_
                             month == "9" ~ "09/01/2021"), format = "%m/%d/%y"), label = T), 
          r_fixed = as.numeric(r_fixed), 
          class_ = as.factor(class), 
-         class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3)) 
+         class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3), 
+         model_type = "Monthly Mean") 
 
 DAP_models_by_month <- ggplot(all_month_models_DAP) + 
   geom_point(aes(month_, Estimate_all), size = 3) +geom_line(aes(month_, Conf_Estimate), size = 1) + 
@@ -1021,22 +1080,27 @@ all_month_range_DAP <- full_join(subset(soil_moist_coeff_df_range, !is.na(DAP_Ca
                                                                 month == "9" ~ "09/01/2021"), format = "%m/%d/%y"), label = T), 
          r_fixed = as.numeric(r_fixed), 
          class_ = as.factor(class), 
-         class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3)) 
+         class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3), 
+         model_type = "Monthly Mean Daily Range") %>% 
+  bind_rows(all_month_models_DAP)
 
 DAP_models_by_month_range <- ggplot(all_month_range_DAP) + 
   geom_point(aes(month_, Estimate_all), size = 3) +geom_line(aes(month_, Conf_Estimate), size = 1) + 
   ylab("Confidence Interval and Estimate for Model") + 
   geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
   scale_color_brewer(palette = "Dark2") + xlab("") +
-  facet_wrap(~class_, scales = "free")+ #ylim(c(-0.29, 0.019)) +
+  facet_grid(cols = vars(model_type), rows = vars(class_), scales = "free_y")+
+  #facet_wrap(~class_, scales = "free")+ #ylim(c(-0.29, 0.019)) +
   ggtitle("Estimates for Canopy Height (m) as a fixed effect on Mean Range") +
   geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
   theme_bw(base_size = 20) + theme(legend.position = "bottom")
 DAP_models_by_month_range
+save_plot(DAP_models_by_month_range, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/monthly_canopy_mods.jpeg", base_height = 11, base_width = 8.5)
+
 ##facet_grid of all models for SI 
-all_month_models_range <- full_join(soil_moist_coeff_df, soil_coeff_df) %>%
-  full_join(surface_coeff_df) %>%  full_join(near_surface_coeff_df) %>% 
-  mutate(variable_simp = case_when(variable == "DAP_Canopy_Height_r5m" | variable == "DAP_Canopy_Height_r15m" ~ "Canopy Height",
+all_month_models_range <- full_join(soil_moist_coeff_df_range, soil_coeff_df_range) %>%
+  full_join(surface_coeff_df_range) %>%  full_join(near_surface_coeff_df_range) %>% 
+  mutate(variable_simp = case_when(variable == "DAP_Canopy_Height_r2m" | variable == "DAP_Canopy_Height_r15m" ~ "Canopy Height",
                                    variable == "elevation_r5m" | variable == "Elevation" ~ "Elevation", 
                                    variable == "aspect.r10m_con" |variable == "aspect.r10m_con" ~ "Aspect", 
                                    variable == "(Intercept)" ~"Intercept"), 
@@ -1049,18 +1113,46 @@ all_month_models_range <- full_join(soil_moist_coeff_df, soil_coeff_df) %>%
          class_ = as.factor(class), 
          class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3) )
 
+##facet_grid of all models for SI 
+all_month_models <- full_join(soil_moist_coeff_df, soil_coeff_df) %>%
+  full_join(surface_coeff_df) %>%  full_join(near_surface_coeff_df) %>% 
+  mutate(variable_simp = case_when(variable == "DAP_Canopy_Height_r2m" | variable == "DAP_Canopy_Height_r15m" ~ "Canopy Height",
+                                   variable == "elevation_r5m" | variable == "Elevation" ~ "Elevation", 
+                                   variable == "aspect.r10m_con" |variable == "aspect.r10m_con" ~ "Aspect", 
+                                   variable == "(Intercept)" ~"Intercept"), 
+         month_ = lubridate::month(lubridate::as_date(case_when(month == "5" ~ "05/01/2021", 
+                                                                month == "6" ~ "06/01/2021", 
+                                                                month == "7" ~ "07/01/2021", 
+                                                                month == "8" ~ "08/01/2021", 
+                                                                month == "9" ~ "09/01/2021"), format = "%m/%d/%y"), label = T),
+         r_fixed = as.numeric(r_fixed), 
+         class_ = as.factor(class), 
+         class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3) )
+
 models_by_month <- ggplot(all_month_models) + 
   geom_point(aes(month_, Estimate_all), size = 3) +geom_line(aes(month_, Conf_Estimate), size = 0.5) + 
   ylab("Confidence Interval and Estimate for Model") + 
   geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
   scale_color_brewer(palette = "Dark2") + xlab("Month") +
   facet_grid(cols = vars(class_), rows = vars(variable_simp), scales = "free_y")+
-  ggtitle("Fixed Effects for Full Model") +
+  ggtitle("Fixed Effects for Full Mean Model") +
   geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
   theme_bw(base_size = 20) + theme(legend.position = "bottom")
 models_by_month
+save_plot(models_by_month, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/monthly_mean_mods_all.jpeg", base_height = 11, base_width = 11)
 
-
+models_by_month_range <- 
+  ggplot(all_month_models_range) + 
+  geom_point(aes(month_, Estimate_all), size = 3) +geom_line(aes(month_, Conf_Estimate), size = 0.5) + 
+  ylab("Confidence Interval and Estimate for Model") + 
+  geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
+  scale_color_brewer(palette = "Dark2") + xlab("Month") +
+  facet_grid(cols = vars(class_), rows = vars(variable_simp), scales = "free_y")+
+  ggtitle("Fixed Effects for Full Range Model") +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
+  theme_bw(base_size = 20) + theme(legend.position = "bottom")
+models_by_month_range
+save_plot(models_by_month_range, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/monthly_range_mods_all.jpeg", base_height = 11, base_width = 11)
 
 # Hypothesis Grap h  ------------------------------------------------------
 

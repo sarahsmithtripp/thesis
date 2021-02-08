@@ -294,13 +294,24 @@ graph <- ggplot(filter(count_measures_distinct)) + #, Plotcode == "CA_ST_fs88"))
   ylab("Temperature")
 graph
 
-
+meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
+data_without_double_coundts<- data_without_double_coundts %>% left_join(meta_data %>% select(Plotcode, plot)) %>% mutate(plot = as.factor(plot))
+levels(data_without_double_coundts$plot) <- seq(1,10, by = 1)
 #following these explorations I have decided all of this data is absolutely useless and we are better off without it 
-Nan_sm <- data_without_double_coundts %>% subset(is.na(vol_sm)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9, 11))
-Nan_sm_graph <- ggplot(Nan_sm, aes(DateTime_GMT, plot_num, group = plot_num)) + 
-  geom_point() + theme_bw() +xlab("Plot ID") + ylab("Month") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
-  ggtitle("Values Excluded From Dataset")
-Nan_sm_graph
+Nan_sm <- data_without_double_coundts %>% subset(!is.na(vol_sm)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9, 11))
+Nan_sm_graph <- ggplot(Nan_sm, aes(DateTime_GMT, plot_num, color = plot)) + 
+  geom_point(size = 0.5) + theme_bw() +xlab("Month") + ylab("Plot ID") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
+  ggtitle("Values Included in Dataset")
+save_plot(Nan_sm_graph, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/included_surface_soil.jpeg", base_height = 11, base_width = 8.5)
+
+
+Nan_T3 <-data_without_double_coundts %>% subset(!is.na(T3)) %>% distinct() %>% mutate(plot_num = substr(Plotcode, 9, 11))
+Nan_T3_graph <- ggplot(Nan_T3, aes(DateTime_GMT, plot_num, color = plot)) + 
+  geom_point(size = 0.5) + theme_bw() +xlab("Month") + ylab("Plot ID") + ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
+  ggtitle("Values Included in Dataset")
+save_plot(Nan_T3_graph, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/included_near_surface_soil.jpeg", base_height = 11, base_width = 8.5)
+
+
 sm_data_soils <- sm_data_soils %>% dplyr::select(-c("FID")) %>% distinct()
 ## Drop columns that do not need to be in the dataset 
 
