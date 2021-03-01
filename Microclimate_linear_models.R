@@ -48,6 +48,8 @@ climate_data_sunrise_join <- climate_data %>%
 
 climate_data <- climate_data_sunrise_join[, c(names(climate_data), 'day_night')]
 
+climate_data_plot_f <- climate_data %>% right_join(select(filter(meta_data, plot == "9"), c("plot", "Plotcode")))
+
 
 # Data Spread (for committee) ---------------------------------------------
 
@@ -178,6 +180,8 @@ climate_modeling_annual <- climate_data_fix %>%
             min_T = mean(min_d, na.rm = T), 
             mean_T = mean(Temp_C, na.rm = T)) %>% 
   left_join(meta_data, by = 'Plotcode')
+
+
 data_check <- filter(climate_modeling_annual, range_T > 18) %>% right_join(climate_data_fix)
 
 ## does not look erroneous 
@@ -394,7 +398,8 @@ annual_model_function <- function(variable, sensor, data, temp, transform) {
 ## across all sensors and variables
 
 #Mean Annual Daily Temperature 
-soil_temp_anova <- annual_model_function("mean_T", "T1", climate_modeling_annual, temp = T)
+soil_temp_anova <- annual_model_function("mean_T", "T1", climate_modeling_annual, temp = T, transform = F)
+
 soil_temp_anova
 
 #soil_annual_lm_complex <- lmer(mean_T ~ DAP_Canopy_Height_r15m + (DAP_Canopy_Height_r15m | plot) + (1|plot), data = filter(climate_modeling_annual, sensor == "T1"))
@@ -501,7 +506,7 @@ near_surface_range_annual_anova  <- annual_model_function("range_T", "T3", clima
 near_surface_range_annual_anova
 
 ## Best model is model 3
-near_surface_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), 
+near_surface_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + aspect.r10m_con + (1|plot), 
                                 data = filter(climate_modeling_annual, sensor == "T3"))
 MuMIn::r.squaredGLMM(near_surface_range_annual_lm)
 
@@ -644,10 +649,10 @@ annual_model_graph <- annual_model_graph + theme(legend.position = "none")
 soil_moist_ann_dat <- filter(climate_modeling_annual, sensor == "T1") %>% subset(!is.na(mean_sm)) %>% left_join(avg_values) %>% mutate(plot = as.factor(plot), 
                                                                                                                                        class = "Soil Moisture")
 levels(soil_moist_ann_dat$plot) <- seq(1,10, by =1)
-soil_moist_annual_lm_avg <- lmer(mean_sm ~ DAP_Canopy_Height_r2m + aspect.r10m_con_avg + elevation_avg + (1|plot), data = soil_moist_ann_dat)
-soil_moist_ann_dat$prediction <- as.numeric(predict(soil_moist_annual_lm_avg))
-soil_moist_ann_dat$prediction_nr <- (soil_moist_ann_dat$DAP_Canopy_Height_r2m *soil_moist_annual_lm_avg@beta[2]) + (unique(avg_values$elevation_avg_nr) * soil_moist_annual_lm_avg@beta[4]) + 
-  (unique(avg_values$aspect.r10m_con_avg_nr) *soil_moist_annual_lm_avg@beta[3]) + (mean(soil_moist_annual_lm_avg@u) +soil_moist_annual_lm_avg@beta[1])
+soil_moist_annual_lm_avg <- lmer(log(mean_sm) ~ DAP_Canopy_Height_r2m + aspect.r10m_con_avg + elevation_avg + (1|plot), data = soil_moist_ann_dat)
+soil_moist_ann_dat$prediction <- as.numeric(exp(predict(soil_moist_annual_lm_avg)))
+soil_moist_ann_dat$prediction_nr <- exp((soil_moist_ann_dat$DAP_Canopy_Height_r2m *soil_moist_annual_lm_avg@beta[2]) + (unique(avg_values$elevation_avg_nr) * soil_moist_annual_lm_avg@beta[4]) + 
+  (unique(avg_values$aspect.r10m_con_avg_nr) *soil_moist_annual_lm_avg@beta[3]) + (mean(soil_moist_annual_lm_avg@u) +soil_moist_annual_lm_avg@beta[1]))
 soil_moist_ann_dat$class <- "Soil Moisture"
 sm_annual_model_graph <- ggplot(soil_moist_ann_dat, aes(group = plot)) + 
   geom_point(aes(DAP_Canopy_Height_r2m, mean_sm, color = plot)) + 
@@ -708,11 +713,13 @@ surface_temp_range$sensor <- "T2"
 
 #near-surface temperature 
 near_surface_temp_range <- model_data(climate_modeling_annual, sensor = "T3", fit_mod =F)
-near_surface_temp_annual_range_avg <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), data = near_surface_temp_range)
+near_surface_temp_annual_range_avg <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m +aspect.r10m_con_avg + (1|plot), data = near_surface_temp_range)
 near_surface_temp_range <- near_surface_temp_annual_range_avg@frame # %>% left_join(climate_modeling_annual)
 #near_surface_temp_range <- add_column(near_surface_temp_range, 'elevation_avg', .after = 2) 
 near_surface_temp_range$prediction <- exp(as.numeric(predict(near_surface_temp_annual_range_avg)))
-near_surface_temp_range$prediction_nr <- exp((near_surface_temp_range$DAP_Canopy_Height_r15m *near_surface_temp_annual_range_avg@beta[2]) + (mean(near_surface_temp_annual_range_avg@u) +near_surface_temp_annual_range_avg@beta[1]))
+near_surface_temp_range$prediction_nr <- exp((near_surface_temp_range$DAP_Canopy_Height_r15m *near_surface_temp_annual_range_avg@beta[2]) +
+                                               (unique(avg_values$aspect.r10m_con_avg_nr) *near_surface_temp_annual_range_avg@beta[3]) + 
+                                               (mean(near_surface_temp_annual_range_avg@u) +near_surface_temp_annual_range_avg@beta[1]))
 near_surface_temp_range$sensor <- "T3"
 
 #temperature graphs
@@ -847,11 +854,35 @@ soil_moist <- ggplot(soil_temp_dat,
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
   theme_bw(base_size = 15) + theme(legend.position = "none")
+soil_moist_plot_avg <- climate_data_fix %>% left_join(select(meta_data, c("Plotcode", "plot"))) %>% 
+  mutate(yday = lubridate::week(DateTime_GMT)) %>% 
+  group_by(Plotcode, yday) %>% 
+  mutate(sm_plot = mean(vol_sm, na.rm = T)) %>%
+  group_by(plot, yday) %>%
+  mutate(mean_sm = mean(vol_sm, na.rm = T),
+            sd_sm = sd(vol_sm, na.rm = T), 
+            upp_sm = mean_sm +sd_sm, 
+            lwr_sm = mean_sm -sd_sm, variable = "Soil Moisture Vol %")
 
-pt1 <- plot_grid(temp, soil_moist, ncol = 1, rel_heights =c(3, 1), rel_widths = c(1.2, 0.8))
+
+soil_moist_2 <- ggplot(soil_moist_plot_avg, aes(group = plot)) +
+  #geom_hex(aes(x = yday, y = sm_plot)) + 
+  #geom_ribbon(aes(yday, ymax = max(sm_plot, na.rm = T), ymin = min(sm_plot, na.rm = T), fill = as.factor(plot)),  linetype = "dashed", alpha = 0.1) + 
+  
+  geom_ribbon(aes(yday, ymax = upp_sm, ymin = lwr_sm, fill = as.factor(plot)),  linetype = "dashed", alpha = 0.1) + 
+  geom_line(aes(yday, mean_sm, color = as.factor(plot))) + 
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  facet_wrap(~variable, ncol = 1) +
+  
+  ylab("Mean Soil Moisture (vol %)") + 
+  xlab("") +
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
+  scale_fill_manual(values = rep("grey", 10)) + 
+  theme_bw(base_size = 15) + theme(legend.position = "none")
+pt1 <- plot_grid(temp, soil_moist_2, ncol = 1, rel_heights =c(3, 1), rel_widths = c(1.2, 0.8))
 
 stack <- plot_grid(pt1, legend, ncol = 2, rel_widths = c(1, 0.2))
-ggplot(climate_data_fix, aes(DateTime_GMT, vol_sm, color = Plotcode)) + geom_line( size = 0.2)
+#ggplot(climate_data_fix, aes(DateTime_GMT, vol_sm, color = Plotcode)) + geom_line( size = 0.2)
 
 
 # soil monthly temperature  -----------------------------------------------

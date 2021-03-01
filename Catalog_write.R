@@ -1,6 +1,5 @@
 #Sarah Smith-Tripp 
 #September 10th 2020 
-#Le jour qui feu en eternelle 
 
 #Code written to make a las catalog for all of the files of all drone DAP points 
 
@@ -185,7 +184,7 @@ returns_forCanopy <- function(Z) {
   }
 
 #Create metrics for a raster grid
-las_gridmetrics = lapply(normalized_1, grid_metrics, my_struct_metrics(Z), res = 0.)
+las_gridmetrics = lapply(normalized_1, grid_metrics, my_struct_metrics(Z), res = 0.1)
 
 las_canopycov <- lapply(normalized_1, grid_metrics, returns_forCanopy(Z), res = 0.1)
 

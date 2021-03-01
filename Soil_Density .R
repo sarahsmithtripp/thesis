@@ -60,7 +60,6 @@ all_plots <- all_plots %>%
                                            plot == '-CONT' ~ 'cont',
                                            plot == 'BT-W' ~ 'bt')), 
          logger = logger...4)
-
 #bind poorly named plots to the main dataframe
 
   
@@ -91,8 +90,7 @@ veg_all_plots<- all_plots %>% left_join(veg_lit, by = "logger")
 
 #Read in plots with fire severity to order the loggers 
 #write sequence to name for numbers 
-seq <- seq(from =1 , to = 10, by = 1)
-fs_seq <- paste0("fs", seq)
+fs_seq <- seq(from =1 , to = 10, by = 1)
 plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
 plots@data <- plots@data %>% 
   arrange(X_firemean) %>%
@@ -131,12 +129,13 @@ veg_all_sum <- all_plots_simp %>% group_by(logger) %>%
   inner_join(all_plots_merge[, c("plot_num", "logger", "area")], by = "logger")%>%
   mutate(logger_fac = as.factor(logger))
 
-
+write.csv(veg_all_sum, "veg_all_sum.csv")
 
 library(ggplot2)
 
 #bulk density 
 all_plots <- left_join(all_plots, plots_df, by = "plot_match")
+write.csv(all_plots, "all_plots.csv")
 bulk_density_graph <- ggplot(all_plots, aes(plot_num, `bulk density`, group = plot_num, color = plot_num)) + 
   geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8), aes(fill = plot_num)) + 
   geom_point(alpha = 0.7, sive = 1.2, position = 'jitter')+

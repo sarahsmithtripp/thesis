@@ -72,7 +72,7 @@ View(trees_plots)
 trees_cart <- polar2cart(trees_plots)
 trees_cart$Plot <- as.factor(trees_cart$Plot)
 
-
+write.csv(trees_cart, "trees_cartesian.csv")
 ##explore the data 
 length(unique(trees$Plot))
 
