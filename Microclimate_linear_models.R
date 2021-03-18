@@ -617,17 +617,14 @@ model_data <- function(data, sensor, fit_mod) {
   data_mod <- data[q,]
   data_mod <- data_mod %>% subset(!is.na(mean_T)) %>% left_join(avg_values)
   if(fit_mod == T) {
-    model <- lmer(mean_T ~ DAP_Canopy_Height_r15m  + aspect.r10m_con_avg + elevation_avg+
+    model <- lmer(mean_T ~ DAP_Canopy_Height_r15m + elevation_avg+
                     + (1|plot), data = data_mod)
     data_mod$predict <- predict(model)
     #model_nr <- lm( mean_T ~ DAP_Canopy_Height_r15m  + aspect.r10m_con_avg_nr + elevation_avg_nr, data = data_mod)
-    data_mod$predict_nr <- (data_mod$DAP_Canopy_Height_r15m *model@beta[2]) + (unique(avg_values$elevation_avg_nr) * model@beta[4]) + 
-      (unique(avg_values$aspect.r10m_con_avg_nr) *model@beta[3]) + (mean(model@u) + model@beta[1])
+    data_mod$predict_nr <- (data_mod$DAP_Canopy_Height_r15m *model@beta[2]) + (unique(avg_values$elevation_avg_nr) * model@beta[3])  + (mean(model@u) + model@beta[1])
     sum <- confint(model)
-    data_mod$lower_nr <- ((data_mod$DAP_Canopy_Height_r15m *sum[4,1]) + (unique(avg_values$elevation_avg_nr)*sum[6,1]) + 
-                            (unique(avg_values$aspect.r10m_con_avg_nr)*sum[5,1]) + sum[3,1])
-    data_mod$upper_nr <- ((data_mod$DAP_Canopy_Height_r15m *sum[4,2]) + (unique(avg_values$elevation_avg_nr)*sum[6,2]) + 
-                            (unique(avg_values$aspect.r10m_con_avg_nr)*sum[5,2]) + sum[3,2])
+    data_mod$lower_nr <- ((data_mod$DAP_Canopy_Height_r15m *sum[4,1]) + (unique(avg_values$elevation_avg_nr)*sum[5,1])  + sum[3,1])
+    data_mod$upper_nr <- ((data_mod$DAP_Canopy_Height_r15m *sum[4,2]) + (unique(avg_values$elevation_avg_nr)*sum[5,2]) + sum[3,2])
     data_mod
   }
   else if (fit_mod == F){
@@ -702,7 +699,7 @@ sm_annual_model_graph <- ggplot(soil_moist_ann_dat, aes(group = plot)) +
 sm_annual_model_graph
 
 mean_plots_stacked <- plot_grid(annual_model_graph, sm_annual_model_graph, rel_heights = c(3,1.2), ncol = 1)
-mean_plot <- plot_grid(plots_stacked, legend, rel_widths = c(1, 0.2), nrow = 1)
+mean_plot <- plot_grid(mean_plots_stacked, legend, rel_widths = c(1, 0.2), nrow = 1)
          
 
 full_annual_mods <- soil_moist_ann_dat %>% 
