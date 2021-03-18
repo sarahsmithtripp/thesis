@@ -290,7 +290,9 @@ lm_r_square <- function(data, resp_variable, det_variable, transform) {
   # gather R^2
   r_squar <- c(summary(lm1)$r.squared, summary(lm2)$r.squared, summary(lm3)$r.squared, 
                summary(lm4)$r.squared, summary(lm5)$r.squared)
+  #resid_plots <- list(plot(lm1)[2], plot(lm2)[2], plot(lm3)[2], plot(lm4)[2], plot(lm5)[2])
   pear_corr <- r_squar ^ 0.5 
+  #return(list(pear_corr, resid_plots))
   return(pear_corr)
 }
 
@@ -298,10 +300,11 @@ soil_models_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(senso
                              "mean_T", det_variable = "DAP_Canopy_Height", transform = F)
 surface_models_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T2"), resp_variable = 
                                       "mean_T", det_variable = "DAP_Canopy_Height", transform = F)
+
 near_surface_models_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T3"), resp_variable = 
                                            "mean_T", det_variable = "DAP_Canopy_Height", transform = F)
 soil_moisture_fixed <- lm_r_square(data = climate_modeling_annual %>% filter(sensor == "T3"), resp_variable = 
-                                           "mean_sm", det_variable = "DAP_Canopy_Height", transform = T)
+                                           "mean_sm", det_variable = "DAP_Canopy_Height", transform =T)
 # soil_models <- lm_r_square_full(data = climate_modeling_annual %>% filter(sensor == "T1"), resp_variable =
 #                              "mean_T", fixed = F)
 # surface_models <- lm_r_square_full(data = climate_modeling_annual %>% filter(sensor == "T2"), resp_variable =
@@ -345,8 +348,8 @@ model_R_all <- data.frame(Radius = c(2,5,10,15,20),
 variation_fixed <- ggplot(model_R_all, aes(Radius, pear_corr, color = Model, pch = Model)) + geom_point(size = 4) +
   geom_line(size = 1, alpha = 0.6, linetype = "dashed") +  #, linetype = "dashed")  +
   ylab(paste('Pearson Correlation Coefficient (r)')) + xlab("Radius (m)") + labs(color = "Growing Season Mean", shape = "Growing Season Mean", pch = "Annual Variable") +
-  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "Soil Moisture (vol %)"))+
-  scale_shape_manual(values = c(15, 16, 17, 18), labels = c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "Soil Moisture (vol %)")) +
+  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))"))+
+  scale_shape_manual(values = c(15, 16, 17, 18), labels = c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))")) +
   theme_bw(base_size = 20) 
 
 variation_fixed
@@ -582,7 +585,7 @@ soil_moist_range_annual_lm <- lmer(range_sm ~ DAP_Canopy_Height_r15m + aspect.r1
 plot(soil_moist_range_annual_lm)
 summary(soil_moist_range_annual_lm)
 # Table of values  --------------------------------------------------------
-Model_Coefficients_Mean <- data.frame(rbind(summary(soil_annual_lm)$coefficients,
+Model_Coefficients_Mean <- data.frame(rbind(summary(soil_annual_lm_n1a)$coefficients,
                             summary(surface_annual_lm)$coefficients,
                             summary(near_surface_annual_lm)$coefficients, 
                             summary(soil_moist_annual_lm_n2)$coefficients))
@@ -668,7 +671,7 @@ annual_model_graph <- ggplot(avg_values_predictions) +
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   xlab("") +
-  theme_bw(base_size = 10) + theme(axis.title.x=element_blank(),
+  theme_bw(base_size = 14) + theme(axis.title.x=element_blank(),
                                    axis.text.x=element_blank(),
                                    axis.ticks.x=element_blank())
 annual_model_graph
@@ -695,7 +698,7 @@ sm_annual_model_graph <- ggplot(soil_moist_ann_dat, aes(group = plot)) +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  theme_bw(base_size = 10) + theme(legend.position = "none")
+  theme_bw(base_size = 14) + theme(legend.position = "none")
 sm_annual_model_graph
 
 mean_plots_stacked <- plot_grid(annual_model_graph, sm_annual_model_graph, rel_heights = c(3,1.2), ncol = 1)
@@ -718,7 +721,7 @@ full_annual_model_graph <- ggplot(full_annual_mods, aes(group = plot)) +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  theme_bw(base_size = 15) #+ theme(legend.position = "none")
+  theme_bw(base_size = 14) #+ theme(legend.position = "none")
 full_annual_model_graph
 
 
@@ -788,7 +791,7 @@ annual_model_graph_range <- ggplot(avg_values_predictions_range) +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
   xlab("") +
   scale_y_continuous(labels = scales::number_format(accuracy = 1)) +
-  theme_bw(base_size = 10) + theme(axis.title.x=element_blank(),
+  theme_bw(base_size = 14) + theme(axis.title.x=element_blank(),
                                    axis.text.x=element_blank(),
                                    axis.ticks.x=element_blank())
 annual_model_graph_range
@@ -811,15 +814,15 @@ soil_moist_ann_range_dat$class <- "Soil Moisture"
 
 sm_annual_range_model_graph <- ggplot(soil_moist_ann_range_dat, aes(group = plot)) + 
   geom_point(aes(DAP_Canopy_Height_r2m, range_sm, color = plot)) + 
-  geom_line(aes(DAP_Canopy_Height_r2m, prediction, color = plot),size = 1, alpha = 0.5) +
-  geom_line(aes(DAP_Canopy_Height_r2m, prediction_nr), color = "black", size = 2, alpha = 0.7) +
+  geom_line(aes(DAP_Canopy_Height_r2m, prediction, color = plot),size = 0.5, alpha = 0.5) +
+  geom_line(aes(DAP_Canopy_Height_r2m, prediction_nr), color = "black", size = 1) +
   ylab("Mean Daily Range in Soil Moisture (% vol)") + 
   labs(color = "Plot") + facet_wrap(~class) +
   xlab("Canopy Height (m)")+
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  theme_bw(base_size = 10) + theme(legend.position = "none")
+  theme_bw(base_size = 14) + theme(legend.position = "none")
 sm_annual_range_model_graph
 
 ## Stack values into a data frame
@@ -829,7 +832,8 @@ full_stack <- plot_grid(mean_plots_stacked, range_plots_stacked, legend, rel_wid
 full_stack
 
 
-save_plot(full_stack, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/annual_mods.jpeg", base_height = 11, base_width = 8.5)
+save_plot(full_stack, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/annual_mods.jpeg", 
+          base_height = 12, base_width = 9.5)
 
 # annual range models  ----------------------------------------------------
 
