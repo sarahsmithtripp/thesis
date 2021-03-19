@@ -841,7 +841,7 @@ save_plot(full_stack, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/annual_m
 # Monthly Models  ---------------------------------------------------------
 
 climate_modeling_month <- climate_data_fix %>% 
-  pivot_longer(cols = c("T1", "T2", "T3"), names_to = 'sensor', values_to = 'Temp_C') %>% 
+  tidyr::pivot_longer(cols = c("T1", "T2", "T3"), names_to = 'sensor', values_to = 'Temp_C') %>% 
   group_by(Plotcode, month, sensor) %>%
   summarize(mean_T = mean(Temp_C, na.rm = T), 
             mean_sm = mean(vol_sm, na.rm = T),
@@ -850,28 +850,42 @@ climate_modeling_month <- climate_data_fix %>%
             )%>%
   left_join(meta_data) %>% 
   filter(!(sensor == "T1" & mean_T > 35)) %>%
-  mutate(variable = case_when(sensor == "T1" ~"Soil 째C (-8 cm)", 
-                              sensor == "T2" ~"Surface 째C (0 cm)",
-                              sensor == "T3" ~"Near-Surface 째C (15 cm)"), 
-         variable_ = factor(variable, levels = c("Soil 째C (-8 cm)", "Surface 째C (0 cm)", "Near-Surface 째C (15 cm)")))
+  mutate(variable = case_when(sensor == "T1" ~"Soil 캜 (-8 cm)", 
+                              sensor == "T2" ~"Surface 캜 (0 cm)",
+                              sensor == "T3" ~"Near-Surface 캜 (15 cm)"), 
+         variable_ = factor(variable, levels = c("Soil 캜 (-8 cm)", "Surface 캜 (0 cm)", "Near-Surface 캜 (15 cm)")),
+         month_ch = lubridate::month(month, label = T))
          # variable_ = fct_relevel(variable_, "Surface 째C (0 cm)", after = 1),
          # variable_ = fct_relevel(variable_, "Near-Surface 째C (15 cm)", after = 2))
 
 
-temp <- ggplot(climate_modeling_month,
-       aes(month, mean_T, group = month)) + 
+temp <- ggplot(climate_modeling_month %>% filter(sensor %in% c("T1", "T2")),
+       aes(month_ch, mean_T, group = month)) + 
   geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
   geom_point(aes(color = as.factor(plot)), alpha = 0.7, position = 'jitter', size = 1)+
-  facet_wrap(~variable_, ncol = 1) +
-  ylab("Average Temperature 째C") + 
+  facet_wrap(~variable_, ncol = 2) +
+  ylab("Average Temperature 캜") + 
   labs(color = "Plot") +
-  xlab("")+
-  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  xlab("")+ # element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
-  theme_bw(base_size = 15)
-legend_temp <- get_legend(temp) + theme_bw(base_size = 25)
+  theme_bw(base_size = 15) + 
+  theme(#axis.text.x = element_blank(), axis.title.x = element_blank(), 
+        panel.spacing = unit(3, "lines"))
+legend_temp <- get_legend(temp)
 temp <- temp +theme(legend.position = "none")
+temp2 <-  ggplot(climate_modeling_month %>% filter(sensor %in% c("T3")),
+                 aes(month_ch, mean_T, group = month)) + 
+  geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
+  geom_point(aes(color = as.factor(plot)), alpha = 0.7, position = 'jitter', size = 1)+
+  facet_wrap(~variable_, ncol = 2) +
+  ylab("Average Temperature 캜") + 
+  labs(color = "Plot") +
+  xlab("")+ # element_text(margin = margin(r= 0.4, l = 0.4)))+
+  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
+  theme_bw(base_size = 15) + theme(legend.position = "none")
+
 
 soil_temp_mean <- climate_data_fix %>% group_by(DateTime_GMT) %>% mutate(mean_vol_sm = mean(vol_sm, na.rm = T)) %>% select("DateTime_GMT", "mean_vol_sm", "Plotcode")
 soil_temp_dat <- climate_modeling_month %>% filter(sensor == "T1") %>% mutate(variable = "Soil Moisture Vol %") #%>% right_join(soil_temp_mean)
@@ -884,40 +898,44 @@ soil_moist <- ggplot(soil_temp_dat,
   facet_wrap(~variable, ncol = 1) +
   ylab("Average Soil Moisture % Vol") + 
   labs(color = "Plot") +
-  xlab("Month")+
+  xlab("Month")+scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
+                             date_labels = "%B") + 
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") +
   theme_bw(base_size = 15) + theme(legend.position = "none")
 soil_moist_plot_avg <- climate_data_fix %>% left_join(select(meta_data, c("Plotcode", "plot"))) %>% 
-  mutate(yday = lubridate::week(DateTime_GMT)) %>% 
-  group_by(Plotcode, yday) %>% 
+  mutate(week = lubridate::week(DateTime_GMT)) %>% 
+  group_by(Plotcode, week) %>% 
   mutate(sm_plot = mean(vol_sm, na.rm = T)) %>%
-  group_by(plot, yday) %>%
-  mutate(mean_sm = mean(vol_sm, na.rm = T),
+  group_by(plot, week) %>%
+  summarise(mean_sm = mean(vol_sm, na.rm = T),
             sd_sm = sd(vol_sm, na.rm = T), 
             upp_sm = mean_sm +sd_sm, 
-            lwr_sm = mean_sm -sd_sm, variable = "Soil Moisture Vol %")
+            lwr_sm = mean_sm -sd_sm, variable = "Soil Moisture Vol %", 
+          date = lubridate::ymd( "2020-01-01" ) + lubridate::weeks(week - 1 ))
 
 
 soil_moist_2 <- ggplot(soil_moist_plot_avg, aes(group = plot)) +
   #geom_hex(aes(x = yday, y = sm_plot)) + 
   #geom_ribbon(aes(yday, ymax = max(sm_plot, na.rm = T), ymin = min(sm_plot, na.rm = T), fill = as.factor(plot)),  linetype = "dashed", alpha = 0.1) + 
   
-  geom_line(aes(yday, y = upp_sm, color = as.factor(plot)),  linetype = "dashed", alpha = 0.6) +
-  geom_line(aes(yday, y = lwr_sm, color = as.factor(plot)),  linetype = "dashed", alpha = 0.6) + 
-  geom_line(aes(yday, mean_sm, color = as.factor(plot))) + 
-  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  #geom_line(aes(yday, y = upp_sm, color = as.factor(plot)),  linetype = "dashed", alpha = 0.6) +
+  #geom_line(aes(yday, y = lwr_sm, color = as.factor(plot)),  linetype = "dashed", alpha = 0.6) + 
+  geom_line(aes(date, mean_sm, color = as.factor(plot))) + 
   facet_wrap(~variable, ncol = 1) +
   
   ylab("Mean Soil Moisture (vol %)") + 
   xlab("") +
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") + 
   scale_fill_manual(values = rep("grey", 10)) + 
+  scale_x_date(date_breaks = "1 month", date_minor_breaks = "1 week",
+               date_labels = "%b") + 
   theme_bw(base_size = 15) + theme(legend.position = "none")
-pt1 <- plot_grid(temp, soil_moist_2, ncol = 1, rel_heights =c(3, 1), rel_widths = c(1.2, 0.8))
+pt1 <- plot_grid(temp2, soil_moist_2, ncol = 2, rel_widths = c(1, 1,2), rel_heights = c(1, 1.2))
+pt2 <- plot_grid(temp, pt1, ncol = 1, rel_widths = c(1, 1.3))
 
-stack <- plot_grid(pt1, legend, ncol = 2, rel_widths = c(1, 0.2))
+stack <- plot_grid(pt2, legend_temp, ncol = 2, rel_widths = c(1, 0.2))
 #ggplot(climate_data_fix, aes(DateTime_GMT, vol_sm, color = Plotcode)) + geom_line( size = 0.2)
 
 
