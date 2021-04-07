@@ -1225,16 +1225,14 @@ all_month_range_DAP <- full_join(subset(soil_moist_coeff_df_range, !is.na(DAP_Ca
          model_type = "Monthly Mean Daily Range") %>% 
   bind_rows(all_month_models_DAP)
 
-DAP_models_by_month_range <- ggplot(all_month_range_DAP) + 
-  geom_point(aes(month_, Estimate_all), size = 3) +geom_line(aes(month_, Conf_Estimate), size = 1) + 
-  ylab("Confidence Interval and Estimate for Model") + 
+DAP_models_by_month_range <- ggplot(filter(all_month_range_DAP, model_type == "Monthly Mean Daily Range")) +
+  geom_point(aes(month_, Estimate_all, color = r_fixed), size = 4) + geom_line(aes(month_, Conf_Estimate, color = r_fixed), size = 2) + 
   geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
-  scale_color_brewer(palette = "Dark2") + xlab("") +
-  facet_grid(cols = vars(model_type), rows = vars(class_), scales = "free_y")+
-  #facet_wrap(~class_, scales = "free")+ #ylim(c(-0.29, 0.019)) +
-  ggtitle("Estimates for Canopy Height (m) as a fixed effect on Mean Range") +
+  viridis::scale_color_viridis(option = "C") + xlab("") + labs(color = expression("Model Adjusted R"^2)) +
+  facet_wrap(~class_, ncol =4) + #ylim(c(-0.29, 0.019)) +
+  ylab(expression("Slope Estimate ("~hat(beta)~") for Canopy Height")) +
   geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
-  theme_bw(base_size = 20) + theme(legend.position = "bottom")
+  theme_bw(base_size = 14) + theme(legend.position = "right")
 DAP_models_by_month_range
 save_plot(DAP_models_by_month_range, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/monthly_canopy_mods.jpeg", base_height = 11, base_width = 8.5)
 
