@@ -356,7 +356,8 @@ model_R_all <- data.frame(Radius = c(2,5,10,15,20),
 variation_fixed <- ggplot(model_R_all, aes(Radius, pear_corr, color = Model, pch = Model)) + geom_point(size = 4) +
   geom_line(size = 1, alpha = 0.6, linetype = "dashed") +  #, linetype = "dashed")  +
   ylab(expression(paste("Model ", R^{2}))) + xlab("Radius (m)") + labs(color = "Growing Season Mean", shape = "Growing Season Mean", pch = "Annual Variable") +
-  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))"))+
+
+  
   scale_shape_manual(values = c(15, 16, 17, 18), labels = c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))")) +
   theme_bw(base_size = 20) 
 
@@ -1196,15 +1197,15 @@ all_month_models_DAP <- full_join(subset(soil_moist_coeff_df, !is.na(DAP_Canopy_
          class_ = fct_relevel(class_, "Soil Moisture vol %", after = 3), class_ = fct_relevel(class_, "Surface °C", before = "Near-Surface °C"), class_ = fct_relevel(class_, "Soil °C", before = "Surface °C"),
          model_type = "Monthly Mean") 
 
-DAP_models_by_month <- ggplot(subset(all_month_models_DAP, 
-#                                     class %in% c("Near-Surface °C","Soil °C", "Surface °C"))) + 
-#class == "Soil Moisture vol %")) + 
+DAP_models_by_month <- ggplot(subset(all_month_models_DAP,
+                                    # class %in% c("Near-Surface °C","Soil °C", "Surface °C"))) +
+# # #class == "Soil Moisture vol %")) +
 )) +
   geom_point(aes(month_, Estimate_all, color = r_fixed), size = 4) + geom_line(aes(month_, Conf_Estimate, color = r_fixed), size = 2) + 
   geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
   viridis::scale_color_viridis(option = "C") + xlab("") + labs(color = expression("Model Adjusted R"^2)) +
-  facet_wrap(~class_, ncol = 2, scales = 
-               "free_y")+ #ylim(c(-0.29, 0.019)) +
+  facet_wrap(~class_, ncol =2, scales = 
+               "free_y") + #ylim(c(-0.29, 0.019)) +
   ylab(expression("Slope Estimate ("~hat(beta)~") for Canopy Height")) +
   geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
   theme_bw(base_size = 14) + theme(legend.position = "right")
@@ -1295,21 +1296,48 @@ models_by_month_range
 save_plot(models_by_month_range, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/monthly_range_mods_all.jpeg", base_height = 11, base_width = 11)
 
 # Hypothesis Grap h  ------------------------------------------------------
-
+variables <- c("Soil", "Soil", "Surface","Surface", "Near Surf.", "Near Surf.",  "Soil Moist.", "Soil Moist.")
 make_data <- data.frame(value = c(rep(-1, 6), rep(1, 2)), 
                         conf_estimate =c(rep(c(-1.5, -0.5), 3), c(1.5, 0.5)), 
                         interval = as.factor(rep(c("upp", "lwr"), 4)), 
-                        variable = c("Soil", "Soil", "Surface","Surface", "Near Surface", "Near Surface", 
-                        "Soil Moisture", "Soil Moisture")) %>% 
-  mutate(variable_factor = fct_relevel(variable, "Soil Moisture", after = 3))
-
-hypothesis_graph <- ggplot(make_data) + 
-  geom_point(aes(variable_factor, value), size = 3) +geom_line(aes(variable_factor, conf_estimate), size = 1) + 
-  ylab(expression(paste(beta, " of Canopy Impact"))) + 
-  geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
+                        variable = variables)
+make_data <- make_data %>% 
+  mutate(variable = as.factor(variable)) %>% mutate(variable = fct_relevel(variable, "Soil Moist.", after = 3)) %>% 
+  mutate(variable = fct_relevel(variable, "Soil", after = 0)) %>% 
+  mutate(variable = fct_relevel(variable, "Surface", after = 1))
+hypothesis_graph <- ggplot(make_data, aes(color = variable)) + 
+  geom_point(aes(variable, value, color = variable), size = 4) +geom_line(aes(variable, conf_estimate), size = 1) + 
+  ylab(expression(paste("Impact (", beta, ") of Canopy Height"))) + 
+  geom_hline(aes(color = variable),yintercept = 0, linetype = "dashed", size = 2) + 
   xlab("") +
-  theme_bw(base_size = 25) + theme(legend.position = "bottom")
+  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "Soil Moisture (vol %)"))+ labs(color = "")+
+  theme_bw(base_size = 25) + theme(legend.position = "")
 hypothesis_graph
+
+# simulate example data
+CanopyHeight <- runif(100, 0, 30)
+Temperature <- -0.1*CanopyHeight + rnorm(100, 16, 0.5)
+SoilMoisture <- 0.001*CanopyHeight + rnorm(100, 0.5, 0.02)
+
+df <- data.frame(CanopyHeight, Temperature, SoilMoisture) %>%
+  pivot_longer(cols = c("Temperature", "SoilMoisture"), names_to = "variable", values_to = "value")
+
+ggplot(df, aes(CanopyHeight, value)) + 
+  geom_point()+ facet_wrap(~variable, scales = "free") + theme_bw()
+
+# fit linear model
+mod <- lm(y ~ x, data = df)
+
+# new values of the independent variable
+x_new <- 1:100
+
+# replaces fitted values of the model object with predictions for new data,
+mod$fitted.values <- predict(mod, data.frame(x=x_new)) # "hack" 
+
+# simulate samples appropriate noise and adds it the models `fitted.values`
+y_new <- simulate(mod)[, 1] # simulate can return multiple samples (as columns), we only need one
+
+
 
  # Committee meeting graphs  -----------------------------------------------
 graph_data <- climate_modeling %>% ungroup %>% dplyr::select(ends_with('m'), 'plot', 'Plotcode', 'Elevation') %>% dplyr::select(-ends_with("_m")) %>% dplyr::distinct()
