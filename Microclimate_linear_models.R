@@ -11,9 +11,9 @@ library(lmtest)
 library(ggeffects)
 
 ## If on .227 
-#setwd("D:/SmithTripp/Gavin_Lake")
+setwd("D:/Data/SmithTripp/Gavin_Lake")
 ## If .226 
-setwd("X:/SmithTripp/Gavin_Lake")
+#setwd("X:/SmithTripp/Gavin_Lake")
 climate_data <- read.csv("Microclimate_Measurements/Microclimate_TMS_UserSoils_Dec-08-20.csv")
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% 
@@ -711,6 +711,20 @@ sm_annual_model_graph <- ggplot(soil_moist_ann_dat, aes(group = plot)) +
   theme_bw(base_size = 14) + theme(legend.position = "none")
 sm_annual_model_graph
 
+sm_annual_nocol_graph <- ggplot(soil_moist_ann_dat, aes(group = plot)) + 
+  geom_point(aes(DAP_Canopy_Height_r2m, mean_sm)) + 
+  #geom_line(aes(DAP_Canopy_Height_r2m, prediction),size = 1, alpha = 0.5) +
+  geom_line(aes(DAP_Canopy_Height_r2m, prediction_nr), color = "black", size = 2, alpha = 0.7) +
+  ylab("Mean Soil Moisture (% vol)") + 
+  labs(color = "Plot") +
+  xlab("Canopy Height (m)")+
+  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
+  #ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
+  #ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
+  theme_bw(base_size = 14) + theme(legend.position = "none")
+sm_annual_nocol_graph
+save_plot("soil_moist_annual.jpeg", sm_annual_nocol_graph, base_height = 3.5, base_width = 4)
+
 mean_plots_stacked <- plot_grid(annual_model_graph, sm_annual_model_graph, rel_heights = c(3,1.2), ncol = 1)
 mean_plot <- plot_grid(mean_plots_stacked, legend, rel_widths = c(1, 0.2), nrow = 1)
          
@@ -790,18 +804,18 @@ soil_graph_df_mean <- avg_values_predictions %>% filter(sensor == "T1") %>% muta
 
 ## graph for IALE
 soil_graph_1 <- ggplot(soil_graph_df_mean) + 
-  geom_point(aes(DAP_Canopy_Height_r15m,mean_T, color = plot)) + 
-  geom_line(aes(DAP_Canopy_Height_r15m, predict, color = plot), alpha = 0.5, size = 1) +
+  geom_point(aes(DAP_Canopy_Height_r15m,mean_T), color = "grey4") + 
+  #geom_line(aes(DAP_Canopy_Height_r15m, predict, color = plot), alpha = 0.5, size = 1) +
   geom_line(aes(DAP_Canopy_Height_r15m, predict_nr), color = "black" ,size = 2, alpha = 0.7) +
-  xlim(0,25) +
+  xlim(0,20) +
   ylab("Mean Growing Season Temperature °C") + 
   labs(color = "Plot") +
   xlab("Canopy Height (m)")+
-  facet_wrap(~model, ncol = 2, scales = "free_y" ) +
+  #facet_wrap(~model, ncol = 2, scales = "free_y" ) +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
   ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
   ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  xlab("") +
+  xlab("Canopy Height (m)") +
   scale_y_continuous(labels = scales::number_format(accuracy = 1)) +
   theme_bw(base_size = 14) + theme(legend.position = "bottom")
 soil_graph_2 <- ggplot(soil_graph_df_range) + 
@@ -1198,19 +1212,21 @@ all_month_models_DAP <- full_join(subset(soil_moist_coeff_df, !is.na(DAP_Canopy_
          model_type = "Monthly Mean") 
 
 DAP_models_by_month <- ggplot(subset(all_month_models_DAP,
-                                    # class %in% c("Near-Surface °C","Soil °C", "Surface °C"))) +
-# # #class == "Soil Moisture vol %")) +
-)) +
-  geom_point(aes(month_, Estimate_all, color = r_fixed), size = 4) + geom_line(aes(month_, Conf_Estimate, color = r_fixed), size = 2) + 
-  geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
-  viridis::scale_color_viridis(option = "C") + xlab("") + labs(color = expression("Model Adjusted R"^2)) +
-  facet_wrap(~class_, ncol =2, scales = 
+#class %in% c("Near-Surface °C","Soil °C", "Surface °C"))) +
+class == "Soil Moisture vol %")) +
+#)) +
+  geom_point(aes(month_, Estimate_all), size = 4) + geom_line(aes(month_, Conf_Estimate), size = 2) + 
+  #geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
+  #scale_colour_gradient(low = "white", high = "black") +
+  viridis::scale_color_viridis(option = "C") + 
+  xlab("") + labs(color = expression("Model Adjusted R"^2)) +
+  facet_wrap(~class_, ncol =3, scales = 
                "free_y") + #ylim(c(-0.29, 0.019)) +
   ylab(expression("Slope Estimate ("~hat(beta)~") for Canopy Height")) +
   geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
   theme_bw(base_size = 14) + theme(legend.position = "right")
 DAP_models_by_month
-
+#save_plot("soil_moist.jpeg",DAP_models_by_month, base_height = 3, base_width = 4)
 all_month_range_DAP <- full_join(subset(soil_moist_coeff_df_range, !is.na(DAP_Canopy_Height_r2m)), 
                                  subset(soil_coeff_df_range, !is.na(DAP_Canopy_Height_r15m))) %>%
   full_join(subset(surface_coeff_df_range, !is.na(DAP_Canopy_Height_r15m))) %>%  full_join(subset(near_surface_coeff_df_range, !is.na(DAP_Canopy_Height_r15m))) %>% 
@@ -1303,12 +1319,12 @@ make_data <- make_data %>%
   mutate(variable = as.factor(variable)) %>% mutate(variable = fct_relevel(variable, "Soil Moist.", after = 3)) %>% 
   mutate(variable = fct_relevel(variable, "Soil", after = 0)) %>% 
   mutate(variable = fct_relevel(variable, "Surface", after = 1))
-hypothesis_graph <- ggplot(make_data, aes(color = variable)) + 
+hypothesis_graph <- ggplot(filter(make_data, variable == "Soil Moist."), aes(color = variable)) + 
   geom_point(aes(variable, value, color = variable), size = 4) +geom_line(aes(variable, conf_estimate), size = 1) + 
-  ylab(expression(paste("Impact (", beta, ") of Canopy Height"))) + 
+  ylab(expression(paste("Impact of Canopy Height"))) + 
   geom_hline(aes(color = variable),yintercept = 0, linetype = "dashed", size = 2) + 
-  xlab("") +
-  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "Soil Moisture (vol %)"))+ labs(color = "")+
+  xlab("") + ylim(-1.6,1.6)+
+  scale_color_manual(values=c("#6699CC", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "Soil Moisture (vol %)"))+ labs(color = "")+
   theme_bw(base_size = 25) + theme(legend.position = "")
 hypothesis_graph
 
