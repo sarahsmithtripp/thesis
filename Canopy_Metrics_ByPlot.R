@@ -99,6 +99,8 @@ radii_1 <- raster::extract(chm_raster,microclimate_locations,
                            sp = F, stringsAsFactors = F)
 
 ## Parallel processing of canopy metrics 
+### Here is example of parallel processing in a loop - I apparently did not do it for my las processing. I just used lapply... 
+
 
 library(doParallel)
 
