@@ -11,9 +11,9 @@ library(lmtest)
 library(ggeffects)
 
 ## If on .227 
-setwd("D:/Data/SmithTripp/Gavin_Lake")
+#setwd("D:/Data/SmithTripp/Gavin_Lake")
 ## If .226 
-#setwd("X:/SmithTripp/Gavin_Lake")
+setwd("X:/SmithTripp/Gavin_Lake")
 climate_data <- read.csv("Microclimate_Measurements/Microclimate_TMS_UserSoils_Dec-08-20.csv")
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% 
@@ -128,7 +128,7 @@ plotter <- function(data,det_variable, resp_variable, transform, label) {
     data_det_vars <- apply(data_det_vars, 2, as.numeric) + 1
     data_det_vars_log <- apply(data_det_vars, 2, log)
     data_transform <- data.frame(data[, c(resp_variable, 'Plotcode', 'month', 'plot')], data_det_vars_log)
-    levels(data_transform$plot) <- fs_seq
+    levels(data_transform$plot) <- seq
     data_transform_gather <- data_transform %>% distinct() %>% pivot_longer(cols = det_variable_list, names_to = "Radius", values_to = "Value")
     names(data_transform_gather )[names(data_transform_gather) == resp_variable ] <- 'Y'
     graph <- ggplot(data_transform_gather, aes(Value, Y, group = as.factor(month))) + 
@@ -356,7 +356,7 @@ model_R_all <- data.frame(Radius = c(2,5,10,15,20),
 variation_fixed <- ggplot(model_R_all, aes(Radius, pear_corr, color = Model, pch = Model)) + geom_point(size = 4) +
   geom_line(size = 1, alpha = 0.6, linetype = "dashed") +  #, linetype = "dashed")  +
   ylab(expression(paste("Model ", R^{2}))) + xlab("Radius (m)") + labs(color = "Growing Season Mean", shape = "Growing Season Mean", pch = "Annual Variable") +
-
+  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))"))+
   
   scale_shape_manual(values = c(15, 16, 17, 18), labels = c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))")) +
   theme_bw(base_size = 20) 
@@ -1241,16 +1241,33 @@ all_month_range_DAP <- full_join(subset(soil_moist_coeff_df_range, !is.na(DAP_Ca
          model_type = "Monthly Mean Daily Range") %>% 
   bind_rows(all_month_models_DAP)
 
-DAP_models_by_month_range <- ggplot(filter(all_month_range_DAP, model_type == "Monthly Mean Daily Range")) +
-  geom_point(aes(month_, Estimate_all, color = r_fixed), size = 4) + geom_line(aes(month_, Conf_Estimate, color = r_fixed), size = 2) + 
-  geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
-  viridis::scale_color_viridis(option = "C") + xlab("") + labs(color = expression("Model Adjusted R"^2)) +
-  facet_wrap(~class_, ncol =4) + #ylim(c(-0.29, 0.019)) +
+DAP_models_by_month_nocol <- ggplot(filter(all_month_models_DAP, model_type == "Monthly Mean"),
+                                    aes( color = class_, pch = class_)) +
+  geom_point(aes(month_, Estimate_all), size = 4) + geom_line(aes(month_, Conf_Estimate), size = 1) + 
+  #geom_text(aes(month_, Estimate_all, label = round(r_fixed,2)), nudge_x = 0.35) + labs(color = "Month") +
+  #viridis::scale_color_viridis(option = "C") + xlab("") + labs(color = expression("Model Adjusted R"^2)) +
+  facet_wrap(~class_, ncol =2, scales = "free_y") +xlab("Month") + #ylim(c(-0.29, 0.019)) +
   ylab(expression("Slope Estimate ("~hat(beta)~") for Canopy Height")) +
-  geom_hline(yintercept = 0, linetype = "dashed", size = 1) + 
-  theme_bw(base_size = 14) + theme(legend.position = "right")
-DAP_models_by_month_range
-save_plot(DAP_models_by_month_range, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/monthly_canopy_mods.jpeg", base_height = 11, base_width = 8.5)
+  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))"))+
+  
+  scale_shape_manual(values = c(15, 16, 17, 18), labels = c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))")) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 1) +
+  theme_bw(base_size = 16) + theme(legend.position = "none")
+DAP_models_by_month_nocol
+
+r_by_month <- ggplot(filter(all_month_models_DAP, model_type == "Monthly Mean"), aes(month_, r_fixed, pch = class_, color = class_)) + geom_point(size = 4) +
+  geom_line(size = 1, alpha = 0.6, linetype = "dashed") +  #, linetype = "dashed")  +
+  ylab(expression(paste("Adjusted Model  ", R^{2}))) + xlab("Month") + labs(color = "Variable", shape = "Variable", pch = "Annual Variable") +
+  scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))"))+
+  
+  scale_shape_manual(values = c(15, 16, 17, 18), labels = c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "ln(Soil Moisture (vol %))")) +
+  theme_bw(base_size = 16) 
+
+r_by_month
+monthly_mods_R <- plot_grid(DAP_models_by_month_nocol, r_by_month, ncol = 2, rel_widths = c(1,1.1))
+save_plot(filename = "D:/Data/SmithTripp/DAP_monthly_mods.jpg", plot = monthly_mods_R, base_height = 11, base_width = 8.5)
+
+# save_plot(DAP_models_by_month_range, filename = "D:/Data/SmithTripp/Gavin_Lake/Figures/monthly_canopy_mods.jpeg", base_height = 11, base_width = 8.5)
 
 ##facet_grid of all models for SI 
 all_month_models_range <- full_join(soil_moist_coeff_df_range, soil_coeff_df_range) %>%
@@ -1354,9 +1371,52 @@ y_new <- simulate(mod)[, 1] # simulate can return multiple samples (as columns),
 
 
  # Committee meeting graphs  -----------------------------------------------
+
+
 graph_data <- climate_modeling %>% ungroup %>% dplyr::select(ends_with('m'), 'plot', 'Plotcode', 'Elevation') %>% dplyr::select(-ends_with("_m")) %>% dplyr::distinct()
 graph_data$plot <- as.factor(graph_data$plot)
-  levels(graph_data$plot) <- seq(1,10, by = 1)
+levels(graph_data$plot) <- seq(1,10, by = 1)
+lm_eqn <- function(y, x, df){
+  m <- lm(y ~ x, df);
+  eq <- substitute(~~italic(R)^2~"="~r2, 
+                                    list(r2 = format(summary(m)$r.squared, digits = 3)))
+  # eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
+  #                  list(a = format(unname(coef(m)[1]), digits = 2),
+  #                       b = format(unname(coef(m)[2]), digits = 2),
+  #                       r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
+obj <- summary(lm(DAP_Canopy_Cover_r15m ~ DAP_Canopy_Height_r15m, graph_data))
+
+r_graph <- c(lm_eqn(graph_data$DAP_Canopy_Cover_r15m, graph_data$DAP_Canopy_Height_r15m, graph_data), lm_eqn(graph_data$DAP_Canopy_Cover_r2m, graph_data$DAP_Canopy_Height_r2m, graph_data))
+             
+  
+height_cover_r15m <- ggplot(graph_data, aes( as.numeric(DAP_Canopy_Height_r15m), 
+                                      as.numeric(DAP_Canopy_Cover_r15m))) +
+  geom_point() + xlim(0,25) + ylim(0,105) + geom_text(x =3, y = 85, label = r_graph[1], size = 6,parse = T) +
+  geom_smooth(method = "lm") +
+  xlab("Canopy Height (m) - 15 m") + 
+  ylab("Canopy Cover (%) - 15 m") + theme_bw(base_size = 16)
+height_cover_r2m <- ggplot(graph_data, aes( as.numeric(DAP_Canopy_Height_r2m), 
+                                        as.numeric(DAP_Canopy_Cover_r2m))) + geom_point() + 
+  geom_text(x =3, y = 85, label = r_graph[2], size = 6,parse = T) +
+  geom_smooth(method = "lm") + xlim(0,25) + ylim(0,105) + 
+  xlab("Canopy Height (m) - 2 m") + 
+  ylab("Canopy Cover (%) - 2 m") + theme_bw(base_size = 14)
+height_LAI_r2m <- ggplot(filter(graph_data, LAI_r2.5m > 0), aes(as.numeric(DAP_Canopy_Height_r2m),
+                                            as.numeric(LAI_r2.5m))) + geom_point()+
+                           geom_smooth(method = "lm") + xlim(0,25)+
+                           xlab("Canopy Height (m) - 2 m") + 
+                           ylab("LAI") + theme_bw(base_size = 14)
+height_LAI_r15m <- ggplot(filter(graph_data, LAI_r2.5m > 0), aes(as.numeric(DAP_Canopy_Height_r15m),
+                                                                as.numeric(LAI_r2.5m))) + geom_point()+ xlim(0,25) +
+  geom_smooth(method = "lm") +
+  xlab("Canopy Height (m) - 15 m") + 
+  ylab("LAI") + theme_bw(base_size = 14)
+
+# save_plot("D:/SmithTripp/height_cover_corr.jpeg", cowplot::plot_grid(height_cover_r2m, height_cover_r15m, ncol = 2), base_width = 10) 
+
 canopy_height <- ggplot(graph_data, aes(as.factor(plot), 
                                         as.numeric(DAP_Canopy_Height_r15m), 
                                         group = as.factor(plot), color = as.factor(plot))) + 
