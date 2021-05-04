@@ -1,6 +1,9 @@
 ##SST 
 #Code written to define the metadata for submission of this dataset to the soil temp dataset 
 
+
+## Not updated to run within soil temp metadata
+
 ## Files to add 
 #Vegetation and Soil Data
 #LAI data 
