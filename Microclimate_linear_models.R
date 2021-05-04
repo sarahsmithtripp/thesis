@@ -353,6 +353,7 @@ model_R_all <- data.frame(Radius = c(2,5,10,15,20),
 #   ylab(paste('Adjusted Model R\u00b2')) + xlab("Radius (m)") + labs(color = "Model")  + scale_color_manual(values=c("#990000", "#cc0000", "#FF3333", "#6699CC"), labels =  c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "Soil Moisture (vol %)"))+
 #   scale_shape_manual(values = c(15, 16, 17, 18), labels = c("Soil (C°)", "Surface (C°)", "Near Surface (C°)", "Soil Moisture (vol %)")) + 
 #   theme_bw(base_size = 20)
+## figure code 
 variation_fixed <- ggplot(model_R_all, aes(Radius, pear_corr, color = Model, pch = Model)) + geom_point(size = 4) +
   geom_line(size = 1, alpha = 0.6, linetype = "dashed") +  #, linetype = "dashed")  +
   ylab(expression(paste("Model ", R^{2}))) + xlab("Radius (m)") + labs(color = "Growing Season Mean", shape = "Growing Season Mean", pch = "Annual Variable") +
@@ -364,7 +365,7 @@ variation_fixed <- ggplot(model_R_all, aes(Radius, pear_corr, color = Model, pch
 variation_fixed
 
 
-
+##figure code 
 facet_grid <- ggplot(climate_modeling_Ht_long %>% filter(Canopy_Radius %in% c("DAP_Canopy_Height_r2m", "DAP_Canopy_Height_r15m") & sensor == "T1"),
        aes(Mean_Canopy_Height, max_T)) + 
   geom_point() + 
@@ -440,7 +441,7 @@ annual_model_function <- function(variable, sensor, data, temp, transform) {
 
 # soil temperatur ---------------------------------------------------------
 ## Similiarly analyses were conducted for all variables, 
-##these have been ommitted from the final code because the results were similiar 
+##these have been ommitted from the final code because the results were similar 
 ## across all sensors and variables
 
 #Mean Annual Daily Temperature 
@@ -535,7 +536,7 @@ model_confidence_df <- model_confidence %>% mutate(lwr_est = as.numeric(.$`2.5 %
 
 model_confidence_df <- model_confidence_df[which(grepl("r15m", model_confidence_df$variable)),]
 
-
+## figure Code 
 model_confidence_graph <- ggplot(model_confidence_df, #%>% filter(variable == "DAP_Canopy_Height_r15m"), 
                                  aes(model_fct, Estimate)) + 
   geom_point(aes(color = model_fct), size = 3) +geom_line(aes(color = model_fct), size = 2) +  ylab("Slope Estimate") + xlab("") + ylim(-0.5, 0.25) + labs( color = "")+
@@ -664,7 +665,8 @@ avg_values_predictions <- avg_values_predictions %>% mutate(plot = as.factor(plo
 levels(avg_values_predictions$plot) <- seq(1,10, by =1)
 
 avg_values_predictions$class <- factor(avg_values_predictions$class,levels = c("Soil", "Surface", "Near-Surface"))
-#levels(avg_values_predictions$sensor) <- c("Soil", "Surface", "Near-Surface")
+
+## Figure Codes 
 annual_model_graph <- ggplot(avg_values_predictions) + 
   geom_point(aes(DAP_Canopy_Height_r15m, mean_T, color = plot)) + 
   geom_line(aes(DAP_Canopy_Height_r15m, predict, color = plot), alpha = 0.5, size = 1) +
@@ -692,12 +694,9 @@ annual_model_graph <- annual_model_graph + theme(legend.position = "none")
 ## plot annual soil moisture 
 soil_moist_ann_dat <- filter(climate_modeling_annual, sensor == "T1") %>% subset(!is.na(mean_sm)) %>% left_join(avg_values) %>% mutate(plot = as.factor(plot), 
                                                                                                                                        class = "Soil Moisture")
-levels(soil_moist_ann_dat$plot) <- seq(1,10, by =1)
-soil_moist_annual_lm_avg <- lmer(log(mean_sm) ~ DAP_Canopy_Height_r2m + aspect.r10m_con_avg + elevation_avg + (1|plot), data = soil_moist_ann_dat)
-soil_moist_ann_dat$prediction <- as.numeric(exp(predict(soil_moist_annual_lm_avg)))
-soil_moist_ann_dat$prediction_nr <- exp((soil_moist_ann_dat$DAP_Canopy_Height_r2m *soil_moist_annual_lm_avg@beta[2]) + (unique(avg_values$elevation_avg_nr) * soil_moist_annual_lm_avg@beta[4]) + 
-  (unique(avg_values$aspect.r10m_con_avg_nr) *soil_moist_annual_lm_avg@beta[3]) + (mean(soil_moist_annual_lm_avg@u) +soil_moist_annual_lm_avg@beta[1]))
-soil_moist_ann_dat$class <- "Soil Moisture"
+
+
+
 sm_annual_model_graph <- ggplot(soil_moist_ann_dat, aes(group = plot)) + 
   geom_point(aes(DAP_Canopy_Height_r2m, mean_sm*100, color = plot)) + 
   geom_line(aes(DAP_Canopy_Height_r2m, prediction*100, color = plot),size = 1, alpha = 0.5) +
@@ -728,25 +727,6 @@ save_plot("soil_moist_annual.jpeg", sm_annual_nocol_graph, base_height = 3.5, ba
 mean_plots_stacked <- plot_grid(annual_model_graph, sm_annual_model_graph, rel_heights = c(3,1.2), ncol = 1)
 mean_plot <- plot_grid(mean_plots_stacked, legend, rel_widths = c(1, 0.2), nrow = 1)
          
-
-full_annual_mods <- soil_moist_ann_dat %>% 
-  mutate(class = "Soil Moisture") %>% 
-  rbind(avg_values_predictions) %>% 
-  mutate(variable = case_when(class == "Near-Surface" | class == "Soil" | 
-                                class == "Surface" ~ mean_T, 
-                            class == "Soil Moisture" ~ mean_sm))
-full_annual_model_graph <- ggplot(full_annual_mods, aes(group = plot)) + 
-  geom_point(aes(DAP_Canopy_Height_r15m, variable, color = plot)) + 
-  geom_line(aes(DAP_Canopy_Height_r15m, prediction, color = plot)) + 
-  ylab("Mean Temperature °C") + 
-  labs(color = "Plot") +
-  xlab("Canopy Height (m)")+
-  facet_wrap(~class, scales = "free") +
-  theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
-  ggthemes::scale_color_tableau(palette = "Classic Cyclic") +
-  ggthemes::scale_fill_tableau(palette = "Classic Cyclic") + guides(fill = F) +
-  theme_bw(base_size = 14) #+ theme(legend.position = "none")
-full_annual_model_graph
 
 
 #range graph 
@@ -802,7 +782,7 @@ soil_graph_df_range <- avg_values_predictions_range %>% filter(sensor == "T1") %
 
 soil_graph_df_mean <- avg_values_predictions %>% filter(sensor == "T1") %>% mutate(model = "Mean")
 
-## graph for IALE
+##Figure code graph for IALE
 soil_graph_1 <- ggplot(soil_graph_df_mean) + 
   geom_point(aes(DAP_Canopy_Height_r15m,mean_T), color = "grey4") + 
   #geom_line(aes(DAP_Canopy_Height_r15m, predict, color = plot), alpha = 0.5, size = 1) +
@@ -837,6 +817,8 @@ soil_graph_2 <- ggplot(soil_graph_df_range) +
 soil_graph <- plot_grid(soil_graph_1, soil_graph_2)
 
 #levels(avg_values_predictions$sensor) <- c("Soil", "Surface", "Near-Surface")
+
+#Figure code
 annual_model_graph_range <- ggplot(avg_values_predictions_range) + 
   geom_point(aes(DAP_Canopy_Height_r15m,range_T, color = plot)) + 
   geom_line(aes(DAP_Canopy_Height_r15m, predict, color = plot), alpha = 0.5, size = 1) +
@@ -892,10 +874,10 @@ range_plots_stacked <- plot_grid(annual_model_graph_range, sm_annual_range_model
 full_stack <- plot_grid(mean_plots_stacked, range_plots_stacked, legend, rel_widths = c(1,1,0.2), nrow = 1)
 full_stack
 
-filename <- c("D:/Data/SmithTripp/Gavin_Lake/Figures/annual_mods.jpeg")
+#filename <- c("D:/Data/SmithTripp/Gavin_Lake/Figures/annual_mods.jpeg")
 #filename <- c("C:/Users/user/Desktop/figure_save.jpeg") 
-save_plot(full_stack, filename = filename,
-          base_height = 12, base_width = 9.5)
+#save_plot(full_stack, filename = filename,
+          #base_height = 12, base_width = 9.5)
 
 # annual range models  ----------------------------------------------------
 
@@ -992,6 +974,7 @@ soil_moist_2 <- ggplot(soil_moist_graph_data, aes(group = Plotcode)) +
 
 pt1 <- plot_grid(temp2, soil_moist_2, ncol = 2, rel_widths = c(1, 1,2), rel_heights = c(1, 1.2))
 pt2 <- plot_grid(temp, pt1, ncol = 1, rel_widths = c(1, 1.3))
+
 
 
 stack <- plot_grid(pt2, legend_temp, ncol = 2, rel_widths = c(1, 0.2))
