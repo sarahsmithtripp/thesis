@@ -3,6 +3,8 @@
 # Code is based on the outputs of the TOMST .csv files 
 # 04 May 2020 -> sourced to the outputs for the initial microclimate test
 
+### Run on computer .227 in room 105
+
 library(tidyverse)
 library(lubridate)
 library(chron)

@@ -1,5 +1,5 @@
 ## code written to parse the loggers based on known errors 
-
+## Run on .227 in room 105
 ## SST 
 ## NOvember 2020
 library(tidyverse)
