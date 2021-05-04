@@ -40,7 +40,7 @@ soil_names <- unique(soils)
 
 ## Here are the TMS user defined values for our soils 
 
-TMS_userdef_Gavin_Lake <- read.csv("Microclimate_Measurements/SM_calibr/GavinLake_Soils_SMCalibrModelCoeff.csv")
+TMS_userdef_Gavin_Lake <- read.csv("_Field-Collected-Data/Soil Data/GavinLake_Soils_SMCalibrModelCoeff.csv")
 TMS_userdef_Gavin_Lake  <- as.data.frame(TMS_userdef_Gavin_Lake)
 names(TMS_userdef_Gavin_Lake) <- c('%clay', '%silt', '%sand', '%total', 'a','b','c')
 # soils_eq_df <- data.frame(TMS_SoilType = soil_names, 
