@@ -5,6 +5,7 @@
 ##This script reads in a set of lat-long coordinates from a CSV
 ## It then defines their extent and creates a bounding box around them 
 ## this bounding box is then used to clip the LAS file of interest 
+## run on computer 105 in room .227 
 setwd("D:/Data/SmithTripp/Gavin_Lake/3D_models")
 library(readxl)
 library(tidyverse)

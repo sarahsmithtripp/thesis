@@ -7,6 +7,7 @@ library(lidR)
 library(raster)
 library(lidRplugins)
 library(rgdal)
+## Run on computer 105 in room .227 
 setwd("D:/Data/SmithTripp/Gavin_Lake/3D_models")
 
 # create list of file locatiosn  ------------------------------------------

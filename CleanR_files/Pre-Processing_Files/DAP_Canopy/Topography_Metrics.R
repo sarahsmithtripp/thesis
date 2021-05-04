@@ -11,6 +11,7 @@ library(sf)
 
 
 # Out   ------------------------------------------
+##run on computer .227 on room 105 
 setwd("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData")
 
 #raster with no values below 2m -> possibly more accurate to canopy height 
