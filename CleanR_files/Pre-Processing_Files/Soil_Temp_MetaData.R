@@ -80,7 +80,7 @@ microclimate_locations_df <-  microclimate_locations@data[, names_ordered] %>%
 
 
 ## step 2 bind LAI data 
-LAI_data <- readxl::read_excel("D:/Data/SmithTripp/Gavin_Lake/LAI_Data/LAI_Plots.xlsx", sheet = "Cleaned")
+LAI_data <- readxl::read_excel("D:/Data/SmithTripp/Gavin_Lake/LAI_Data/LAI_Plots_Clean.xlsx")
 
 #clean naming between LAI and canopy covert to join 
 LAI_data <- LAI_data %>% 

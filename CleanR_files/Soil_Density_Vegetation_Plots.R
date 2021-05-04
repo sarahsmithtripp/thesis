@@ -1,8 +1,8 @@
 ## Script written to make figure for soil density 
-
+## And Vegetatio n 
 library(dplyr)
 library(tidyverse)
-
+library(lme4)
 #Sarah's Laptop 
 #setwd("~/Documents/UBC/Thesis/Methods")
 #School Computer
@@ -300,7 +300,7 @@ anova(lm(all_plots$`bulk density` ~ all_plots$plot_num))
 
 
 
-library(lme4)
+
 
 lit_aov <- aov(Lit_depth_cm ~ plot_num + point*plot_num, data=all_plots_simp)
 
@@ -313,12 +313,8 @@ sd(all_plots_simp$Lit_depth_cm)
 mean(all_plots_simp$Lit_depth_cm)
 hist(all_plots_simp$Lit_depth_cm)
 veg_aov <- aov(Veg_depth_cm ~ plot_num + point*plot_num, data=all_plots_simp)
-min(all_plots_simp$Veg_depth_cm)
-max(all_plots_simp$Veg_depth_cm)
-sd(all_plots_simp$Veg_depth_cm)
+
 
 veg_all_sum %>% 
   group_by(plot_num) %>%
   summarise(mean = mean(mean_veg))
-mean(veg_all_sum$mean_veg)
-summary(veg_aov)
