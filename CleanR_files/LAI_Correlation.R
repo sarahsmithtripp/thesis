@@ -15,7 +15,8 @@ library(readxl)
 library(cowplot)
 
 
-#Set working directory to LAI files 
+#Set working directory to LAI files
+## Code NOT UPDATED TO RUN WITH METADATA 
 setwd("D:/Data/SmithTripp/Gavin_Lake/LAI_Data")
 
 ## Necessary Variables 

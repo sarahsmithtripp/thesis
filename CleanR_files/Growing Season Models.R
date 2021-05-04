@@ -14,14 +14,12 @@ library(ggeffects)
 
 
 # Set Working Directory to computer that you are working on (both 105)  --------
-## If on .227 
-#setwd("D:/Data/SmithTripp/Gavin_Lake")
-## If .226 
-setwd("X:/SmithTripp/Gavin_Lake")
+#setwd("F:/SmithTripp_Metadata")
 
 # Load Microclimate Data and Meta-Data  -------------------------------------------------
 #climate data 
-climate_data <- read.csv("Microclimate_Measurements/Microclimate_TMS_UserSoils_Dec-08-20.csv")
+#
+climate_data <- read.csv("_Microclimate-Data/PROCESSED_Microclimate_TMS_UserSoils.csv")
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% #filter to the study period 
   mutate(DateTime = as.Date(DateTime_GMT), 
@@ -31,7 +29,7 @@ climate_data <- climate_data %>%
          DateTime_Hour = lubridate::ymd_h(paste(DateTime, Hour)))
 
 #Meta_Data 
-meta_data <- read.csv("CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
+meta_data <- read.csv("_SoilTemp/CA_ST_MetaData_27-Nov-2020.csv", header = T)
 ## Convert aspect to formula used in Thesis (see equation 1) 
 meta_data_asp <- dplyr::select(meta_data, contains("aspect"),'Plotcode')
 meta_data_asp[,1:5] <- apply(meta_data_asp[,1:5], 2, function(x) { cos((pi/4) * (x*180)/pi) } )
