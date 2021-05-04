@@ -6,10 +6,11 @@ library(lme4)
 #Sarah's Laptop 
 #setwd("~/Documents/UBC/Thesis/Methods")
 #School Computer
-setwd("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)")
+#setwd("F:/SmithTripp_Metadata")
+
 
 #read in soil_data
-soil_data <- readxl::read_excel("Sample_Sites_Soil.xlsx", sheet = "Sheet1")
+soil_data <- readxl::read_excel("_Field-Collected-Data/Soil Data/Sample_Sites_Soil.xlsx", sheet = "Sheet1")
 
 soil_data_plots <- soil_data %>% 
   tidyr::separate(col = ID...1, into = c("plot", "point"), sep = '-w', extra = "merge")
@@ -63,7 +64,7 @@ all_plots <- all_plots %>%
 #bind poorly named plots to the main dataframe
 
   
-vegetation_data <- readxl::read_excel("Vegetation_Data_Clean.xlsx")
+vegetation_data <- readxl::read_excel("_Field-Collected-Data/Vegetation and Litter Data/Vegetation_Data_Clean.xlsx")
 litter <- which(grepl("Lit", names(vegetation_data)))
 veg <- which(grepl("Veg", names(vegetation_data)))
 vegetation_data[,c(veg, litter)] <- lapply(vegetation_data[,c(veg, litter)], as.numeric)
@@ -91,7 +92,7 @@ veg_all_plots<- all_plots %>% left_join(veg_lit, by = "logger")
 #Read in plots with fire severity to order the loggers 
 #write sequence to name for numbers 
 fs_seq <- seq(from =1 , to = 10, by = 1)
-plots <- rgdal::readOGR("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/Plots.shp")
+plots <- rgdal::readOGR("_field-site-data/Plots.shp")
 plots@data <- plots@data %>% 
   arrange(X_firemean) %>%
   mutate(
@@ -119,7 +120,7 @@ all_plots_simp <- all_plots_merge[,c('plot', 'point', 'Measurement', 'logger', '
                                      'Comments Oct', "Comments june-july", "Original Logger", 
                                      'X_firemean', "X_firestdev", 'plot_num', 'Soil Type')]
 
-write.csv(all_plots_simp, "Veg-Soil-PlotFireSev.csv")
+#write.csv(all_plots_simp, "Veg-Soil-PlotFireSev.csv")
 
 veg_all_sum <- all_plots_simp %>% group_by(logger) %>% 
   summarize(mean_veg = mean(Veg_depth_cm),
@@ -129,7 +130,7 @@ veg_all_sum <- all_plots_simp %>% group_by(logger) %>%
   inner_join(all_plots_merge[, c("plot_num", "logger", "area")], by = "logger")%>%
   mutate(logger_fac = as.factor(logger))
 
-write.csv(veg_all_sum, "veg_all_sum.csv")
+#write.csv(veg_all_sum, "veg_all_sum.csv")
 
 library(ggplot2)
 
@@ -148,7 +149,7 @@ bulk_density_graph <- ggplot(all_plots, aes(plot_num, `bulk density`, group = pl
   cowplot:: theme_cowplot()
 
 bulk_density_graph
-ggsave("Bulk Density.jpeg", bulk_density_graph, width = 7, height = 4)
+#ggsave("Bulk Density.jpeg", bulk_density_graph, width = 7, height = 4)
 #vegetation_data 
 
 library(dplyr)
@@ -314,7 +315,3 @@ mean(all_plots_simp$Lit_depth_cm)
 hist(all_plots_simp$Lit_depth_cm)
 veg_aov <- aov(Veg_depth_cm ~ plot_num + point*plot_num, data=all_plots_simp)
 
-
-veg_all_sum %>% 
-  group_by(plot_num) %>%
-  summarise(mean = mean(mean_veg))
