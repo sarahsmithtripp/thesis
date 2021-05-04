@@ -1,11 +1,19 @@
 #SST 
-# Code written to parse the CSV files for microclimate loggers 
+# Code written to parse the CSV files for microclimate loggers and add them to one larger file 
 # Code is based on the outputs of the TOMST .csv files 
 # 04 May 2020 -> sourced to the outputs for the initial microclimate test
 
 library(tidyverse)
 library(lubridate)
 library(chron)
+#install.packages("tidyquant")
+library(tidyquant)
+library(stringr)
+library(purrr)
+library(broom)
+library(xts)
+#remotes::install_github("giocomai/ganttrify")
+library(ganttrify)
 #setwd("/Volumes/My Passport/BackUps/JuneFieldWork_Loggers")
 setwd("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements")
 #Create a folder repository for the data that you would like to read in
@@ -174,12 +182,7 @@ pkgs <- c(
   "broom", "tidyquant", "ggplot2", "purrr", 
   "stringr", "knitr"
 )
-#install.packages("tidyquant")
-library(tidyquant)
-library(stringr)
-library(purrr)
-library(broom)
-library(xts)
+
 
 custom_stat_fun_2 <- function(x, na.rm = TRUE) {
   # x     = numeric vector
@@ -227,8 +230,7 @@ ggplot(data_cbind, aes(group = Logger)) +
 
 
 ## 
-#remotes::install_github("giocomai/ganttrify")
-library(ganttrify)
+
 ## one to test data filtering on 
 known_err <- data_pre_filter[which(grepl("94203245", names(data_veg_list)))]$'94203245'
 test <-  

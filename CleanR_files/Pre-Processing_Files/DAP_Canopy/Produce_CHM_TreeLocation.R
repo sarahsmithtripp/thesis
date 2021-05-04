@@ -1,12 +1,12 @@
 #Sarah Smith-Tripp 
 #September 10th 2020 
 
-#Code written to make a las catalog for all of the files of all drone DAP points 
+#Code written to make canopy height models from point cloud dat a
 
 library(lidR)
 library(raster)
 library(lidRplugins)
-
+library(rgdal)
 setwd("D:/Data/SmithTripp/Gavin_Lake/3D_models")
 
 # create list of file locatiosn  ------------------------------------------
@@ -272,14 +272,14 @@ for(i in 1:4){
 
 #write trees to file 
 #Save CHM
-library(rgdal)
-writeOGR(tree_heights
-         [[1]], layer = "lower_plots_treeloc", dsn = paste0(getwd(),
-                                                    "/LowerPlots/trees"), driver = "ESRI Shapefile")
-writeOGR(tree_heights[[2]], layer = "old_guy_treeloc", dsn = paste0(getwd(),
-                                             "/Old_guy/trees"), driver = "ESRI Shapefile")
-writeOGR(tree_heights[[3]], layer = "midplotS_treeloc", dsn = paste0(getwd(),
-                                                   "/midplots/trees"), driver = "ESRI Shapefile")
-writeOGR(tree_heights[[4]], layer = "topplots_treeloc", dsn = paste0(getwd(),
-                                                    "/TopPlots/trees"), driver = "ESRI Shapefile")
+# library(rgdal)
+# writeOGR(tree_heights
+#          [[1]], layer = "lower_plots_treeloc", dsn = paste0(getwd(),
+#                                                     "/LowerPlots/trees"), driver = "ESRI Shapefile")
+# writeOGR(tree_heights[[2]], layer = "old_guy_treeloc", dsn = paste0(getwd(),
+#                                              "/Old_guy/trees"), driver = "ESRI Shapefile")
+# writeOGR(tree_heights[[3]], layer = "midplotS_treeloc", dsn = paste0(getwd(),
+#                                                    "/midplots/trees"), driver = "ESRI Shapefile")
+# writeOGR(tree_heights[[4]], layer = "topplots_treeloc", dsn = paste0(getwd(),
+#                                                     "/TopPlots/trees"), driver = "ESRI Shapefile")
 
