@@ -5,11 +5,12 @@
 ## Ground Control Points are written seperately from CSV points 
 ### update on July 22, data is cleaned and extraneous plot level points are removed 
 
-
+## Set working directory to metadata location 
+setwd("F:/SmithTripp_Metadata")
 library(xml2)
-setwd("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/GPX_Waypoints")
+
 #alex_frazer <- read_xml("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Sample_Location/alexfraser_UTM_Leica.xml")
-alex_frazer <- read_xml("D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/tree_data/alexfraser.xml")
+alex_frazer <- read_xml("_Field-Collected-Data/GPS_Points/alexfraser.xml")
 data <- as_list(alex_frazer)
 data$LandXML$CgPoints
 
