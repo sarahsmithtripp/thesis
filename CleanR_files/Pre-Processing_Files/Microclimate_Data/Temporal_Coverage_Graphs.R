@@ -10,12 +10,12 @@ seq <- seq(from =1 , to = 10, by = 1)
 fs_seq <- paste0("fs", seq)
 
 #Read in meta-data for plots
-meta_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/CA_ST_SoilTempData/CA_ST_MetaData.csv", header = T)
+meta_data <- read.csv("_SoilTemp/CA_ST_MetaData_27-Nov-2020.csv", header = T)
 meta_data$plot <- as.factor(meta_data$plot)
 levels(meta_data$plot) <- seq(1,10, by = 1)
 
 #read in climate data 
-climate_data <- read.csv("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements/Microclimate_TMS_UserSoils_Dec-08-20.csv")
+climate_data <- read.csv("_Microclimate-Data/PROCESSED_Microclimate_TMS_UserSoils.csv")
 climate_data <- climate_data %>% 
   filter(DateTime_GMT > "2020-05-15" & DateTime_GMT < "2020-10-10") %>% 
   mutate(DateTime = as.Date(DateTime_GMT), 
