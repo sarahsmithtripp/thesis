@@ -3,7 +3,7 @@
 
 
 ## Not updated to run within soil temp metadata
-
+## run on computer .227 in room 105
 ## Files to add 
 #Vegetation and Soil Data
 #LAI data 
