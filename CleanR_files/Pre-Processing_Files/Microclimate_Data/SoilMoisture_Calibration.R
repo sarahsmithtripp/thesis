@@ -53,9 +53,24 @@ parameters_eq <- function(a,b,c, x){
   return(soil_moist)
 }
 
+values <- seq(0, 3500, by = 60)
+list_store <- list()
+for(i in 1:length(TMS_userdef_Gavin_Lake$a)){
+  print(i)
+  name_a <- TMS_userdef_Gavin_Lake$a[i]
+  name_b <- TMS_userdef_Gavin_Lake$b[i]
+  name_c <- TMS_userdef_Gavin_Lake$c[i]
+  out <- parameters_eq(a = name_a, b = name_b, c= name_c, x = values)
 
+    list_store[[i]] <- data.frame(a = name_a, b = name_b, c= name_c, id = i, sm_count = values, sm_vol = out)
+}
 
-values <- seq(0, 3500, by = 0.05)
-
-
-#plot(data$values, data$loam_curve)
+data_full <- as.data.frame(do.call(rbind, list_store))  %>% left_join(TMS_userdef_Gavin_Lake) 
+#names(data_full) <- c( "a", "b", "c", "id", "sm_count","sm_vol" ,"perc_clay_r1m", "perc_silt_r1m", "perc_sand_r1m",   "%total")  
+ggplot(data_full) +
+  geom_line(aes(sm_count, sm_vol, color = as.factor(id))) +
+  xlab("Soil Moisture Count") +
+  ylab("Soil Moisture Vol %") +
+  labs(color = "Soil Type Unique ID") +
+  scale_color_brewer(palette = "Paired")  +
+  theme_bw()
