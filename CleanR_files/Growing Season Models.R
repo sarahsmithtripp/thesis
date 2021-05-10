@@ -14,8 +14,7 @@ library(ggeffects)
 
 
 # Set Working Directory to computer that you are working on (both 105)  --------
-#setwd("F:/SmithTripp_Metadata")
-
+setwd("D:/Data/SmithTripp/SmithTripp_Metadata/")
 # Load Microclimate Data and Meta-Data  -------------------------------------------------
 #climate data 
 #
@@ -34,7 +33,8 @@ meta_data <- read.csv("_SoilTemp/CA_ST_MetaData_27-Nov-2020.csv", header = T)
 meta_data_asp <- dplyr::select(meta_data, contains("aspect"),'Plotcode')
 meta_data_asp[,1:5] <- apply(meta_data_asp[,1:5], 2, function(x) { cos((pi/4) * (x*180)/pi) } )
 names(meta_data_asp) <- c(paste0(names(meta_data_asp)[1:5], "_con"), "Plotcode")
-meta_data <- left_join(meta_data, meta_data_asp)
+meta_data <- left_join(meta_data, meta_data_asp) %>% 
+  mutate(Plotcode = as.factor(Plotcode))
 
 #Define sequence to use to order plots 
 seq <- seq(from =1 , to = 10, by = 1)
@@ -46,8 +46,7 @@ climate_sums <-climate_data %>% mutate(yday = lubridate::yday(DateTime_GMT)) %>%
   group_by(Plotcode, month) %>% summarise(mean_max_m_T1 = mean(max_daily_T1, na.rm = T),
                                           mean_max_m_T2 = mean(max_daily_T2, na.rm = T),
                                           mean_max_m_T3 = mean(max_daily_T3, na.rm = T)) %>% 
-  pivot_longer(cols = contains("mean_max"), names_to = "Temp_Sensor", values_to = "Mean_max_m") %>%
-  left_join(meta_data[,c("Plotcode", "plot")])
+  pivot_longer(cols = contains("mean_max"), names_to = "Temp_Sensor", values_to = "Mean_max_m")
 quick_data_fix <- climate_data %>% 
   filter(Plotcode %in% 
            filter(climate_sums, Mean_max_m>30 & Temp_Sensor == "mean_max_m_T1")$Plotcode) %>% 
@@ -61,7 +60,8 @@ climate_data_fix <- climate_data %>%  filter(!Plotcode %in%
 # Summarize climate data for the growing season  --------------------------
 climate_modeling_annual <- climate_data_fix %>% 
   group_by(Plotcode, DateTime) %>% 
-  mutate(mean_sm = mean(vol_sm, na.rm = T), 
+  mutate(mean_sm_count = mean(SM_Count, na.rm = T),
+    mean_sm = mean(vol_sm, na.rm = T), 
          range_sm = max(vol_sm, na.rm = T) - min(vol_sm, na.rm = T) ) %>%
   pivot_longer(cols = c("T1", "T2", "T3"), names_to = 'sensor', values_to = 'Temp_C') %>% 
   group_by(Plotcode, sensor, DateTime) %>% 
@@ -69,7 +69,8 @@ climate_modeling_annual <- climate_data_fix %>%
          max_d = max(Temp_C), 
          range_d = (max_d - min_d))%>% 
   group_by(Plotcode, sensor) %>% 
-  summarise(mean_sm = mean(mean_sm, na.rm = T), 
+  summarise(mean_sm_count = mean(mean_sm_count, na.rm = T),
+      mean_sm = mean(mean_sm, na.rm = T), 
             range_sm = mean(range_sm, na.rm = T),
             #mean_sm = mean(vol_sm, na.rm = T),
             range_T = mean(range_d, na.rm = T), 
@@ -78,7 +79,22 @@ climate_modeling_annual <- climate_data_fix %>%
             mean_T = mean(Temp_C, na.rm = T)) %>% 
   left_join(meta_data, by = 'Plotcode')
 
-
+#run soil moisture calibration before running next lines of code
+## show that conversion to soil moisture by soil type works and whay it looks like 
+# Unique_soil_ID <- as.data.frame(cbind(id = seq(1,11, by = 1), 
+#                               unique(as.matrix(select(climate_modeling_annual, contains("perc"))))[,2:4])) %>% 
+#   mutate_if(is.character, as.numeric)%>% 
+#   right_join(climate_modeling_annual) %>% 
+#   left_join(data_full)
+#   
+# ggplot(Unique_soil_ID, aes(group = id)) + 
+#   geom_point(aes(mean_sm_count, mean_sm, shape = "Mean Growing Season Value")) +
+#   geom_line(aes(sm_count, sm_vol, color = as.factor(id))) + 
+#   xlab("Soil Moisture Count") +
+#   ylab("Soil Moisture Vol %") +
+#   labs(color = "Soil Type Unique ID", shape = "Mean Growing Season Value") +
+#   scale_color_brewer(palette = "Paired")  +
+#   theme_bw()
 # Correlation between growing season microclimate and canopy height --------
 
 #Note: Previous iterations of this function would also plot graphs to check assumptions 
