@@ -80,11 +80,12 @@ climate_modeling_month <- climate_data_fix %>%
          month_ch = lubridate::month(month, label = T))
 
 #Figure code for data figure (First figure in paper)
-temp <- ggplot(climate_modeling_month %>% filter(sensor %in% c("T1", "T2")),
+temp <- ggplot(climate_modeling_month
+               %>% filter(sensor %in% c("T1", "T2")),
                aes(month_ch, mean_T, group = month)) + 
   geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
   geom_point(alpha = 0.7, position = 'jitter', size = 1)+
-  facet_wrap(~variable_, ncol = 2) +
+  facet_wrap(~variable_, ncol = 3) +
   ylab("Mean Temperature °C") + ylim(7, 18)+
   labs(color = "Plot") +
   xlab("")+ # element_text(margin = margin(r= 0.4, l = 0.4)))+

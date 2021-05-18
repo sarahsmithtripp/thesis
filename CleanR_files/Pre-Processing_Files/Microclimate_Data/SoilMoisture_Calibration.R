@@ -65,7 +65,7 @@ for(i in 1:length(TMS_userdef_Gavin_Lake$a)){
     list_store[[i]] <- data.frame(a = name_a, b = name_b, c= name_c, id = i, sm_count = values, sm_vol = out)
 }
 
-data_full <- as.data.frame(do.call(rbind, list_store))  %>% left_join(TMS_userdef_Gavin_Lake) 
+data_full <- as.data.frame(do.call(rbind, list_store))  #%>% left_join(TMS_userdef_Gavin_Lake) 
 #names(data_full) <- c( "a", "b", "c", "id", "sm_count","sm_vol" ,"perc_clay_r1m", "perc_silt_r1m", "perc_sand_r1m",   "%total")  
 ggplot(data_full) +
   geom_line(aes(sm_count, sm_vol, color = as.factor(id))) +

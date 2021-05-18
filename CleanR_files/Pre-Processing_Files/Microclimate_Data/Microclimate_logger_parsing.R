@@ -4,6 +4,7 @@
 ## NOvember 2020
 library(tidyverse)
 
+
 library(zoo)
 
 setwd("D:/Data/SmithTripp/Gavin_Lake/Microclimate_Measurements")
@@ -254,6 +255,7 @@ names(soil_data_TMS) <- c('%silt', "%sand", "%clay",'Logger.x') ## rename soil d
 
 logger_plotcode <- read.csv(file = "D:/Data/SmithTripp/Gavin_Lake/Field_SiteData/Microclimate_SiteData(veg-soil)/logger_plotcode.csv")
 soil_data_TMS <- soil_data_TMS %>% full_join(logger_plotcode) %>% dplyr::select(-contains("Logger"))
+
 sm_data_soil <- left_join(simple_data_plots, soil_data_TMS)
 
 ### run script to get model coefficients 
