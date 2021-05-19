@@ -487,7 +487,10 @@ soil_annual_lm_n3  <- lm(mean_T ~ DAP_Canopy_Height_r15m,
                           data = filter(climate_modeling_annual, sensor == "T1"))
 anova(soil_annual_lm, soil_annual_lm_n1a, soil_annual_lm_n1b, soil_annual_lm_n2, soil_annual_lm_n3)
 summary(soil_annual_lm_n1a)
-## soil_annaul_Lm is the best model 
+MuMIn::r.squaredGLMM(soil_annual_lm_n1a)
+range(as.numeric(unlist(ranef(soil_annual_lm)$plot)))
+
+## soil_annaul_Lm_n1a is the best model 
 
 ## Mean Annual range in temperature 
 soil_range_annual_anova  <- annual_model_function("range_T", "T1", climate_modeling_annual, temp = T, transform = T)
@@ -497,12 +500,17 @@ soil_range_annual_anova
 soil_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T1"))
 summary(soil_range_annual_lm)
+MuMIn::r.squaredGLMM(soil_range_annual_lm)
+range(as.numeric(unlist(ranef(soil_range_annual_lm)$plot)))
+
 # Surface Models  ---------------------------------------------------------
 surface_model_anova <- annual_model_function("mean_T", "T2", climate_modeling_annual, temp = T, transform = F)
 surface_model_anova
 surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + Elevation + (1|plot), 
                        data = filter(climate_modeling_annual, sensor == "T2"))
 summary(surface_annual_lm)
+MuMIn::r.squaredGLMM(surface_annual_lm)
+range(as.numeric(unlist(ranef(surface_annual_lm)$plot)))
 
 #anova(surface_annual_lm, surface_annual_lm_n1a, surface_annual_lm_n1b, surface_annual_lm_n2, surface_annual_lm_n3)
 ### best model is full model
@@ -514,7 +522,8 @@ surface_range_annual_anova
 surface_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + (1|plot),
                                 data = filter(climate_modeling_annual, sensor == "T2"))
 summary(surface_range_annual_lm)
-
+MuMIn::r.squaredGLMM(surface_range_annual_lm)
+range(as.numeric(unlist(ranef(surface_range_annual_lm)$plot)))
 
 # Near Surface  -----------------------------------------------------------
 near_surface_anova <- annual_model_function("mean_T", "T3", climate_modeling_annual, temp = T, transform = F)
@@ -522,6 +531,9 @@ near_surface_anova
 near_surface_annual_lm <- lmer(mean_T ~ DAP_Canopy_Height_r15m + Elevation + (1|plot), 
                           data = filter(climate_modeling_annual, sensor == "T3"))
 summary(near_surface_annual_lm)
+range(as.numeric(unlist(ranef(near_surface_annual_lm)$plot)))
+
+MuMIn::r.squaredGLMM(near_surface_annual_lm)
 ### plot confidence intervales
 model_confidence <- as.data.frame(rbind( 
                           cbind(confint(surface_annual_lm), rep("Surface", 5)),
@@ -578,6 +590,8 @@ near_surface_range_annual_anova
 near_surface_range_annual_lm <- lmer(log(range_T) ~ DAP_Canopy_Height_r15m + aspect.r10m_con + (1|plot), 
                                 data = filter(climate_modeling_annual, sensor == "T3"))
 MuMIn::r.squaredGLMM(near_surface_range_annual_lm)
+range(as.numeric(unlist(ranef(near_surface_range_annual_lm)$plot)))
+
 summary(near_surface_range_annual_lm)
 # Soil Moisture  ----------------------------------------------------------
 
@@ -602,7 +616,7 @@ soil_moist_annual_lm_n2 <- lmer(log(mean_sm) ~ DAP_Canopy_Height_r2m + (1|plot),
 soil_moist_annual_lm_n3  <- lm(log(mean_sm) ~ DAP_Canopy_Height_r2m,
                                  data = filter(climate_modeling_annual, sensor == "T3"))
 anova(soil_moist_annual_lm, soil_moist_annual_lm_n1a, soil_moist_annual_lm_n1b, soil_moist_annual_lm_n2, soil_moist_annual_lm_n3)
-
+range(as.numeric(unlist(ranef(soil_moist_annual_lm)$plot)))
 MuMIn::r.squaredGLMM(soil_moist_annual_lm)
 
 summary(soil_moist_annual_lm_n2)
@@ -616,6 +630,8 @@ soil_moist_range_annual_lm <- lmer(range_sm ~ DAP_Canopy_Height_r15m + (1|plot),
                                      data = climate_modeling_annual %>% filter(sensor == "T3") %>% subset(!is.infinite(range_sm)))
 plot(soil_moist_range_annual_lm)
 summary(soil_moist_range_annual_lm)
+MuMIn::r.squaredGLMM(soil_moist_range_annual_lm)
+range(as.numeric(unlist(ranef(soil_moist_range_annual_lm)$plot)))
 # Table of values  --------------------------------------------------------
 Model_Coefficients_Mean <- data.frame(rbind(summary(soil_annual_lm_n1a)$coefficients,
                             summary(surface_annual_lm)$coefficients,
