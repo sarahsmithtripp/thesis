@@ -140,7 +140,7 @@ write.csv(all_plots, "all_plots.csv")
 bulk_density_graph <- ggplot(all_plots, aes(plot_num, `bulk density`, group = plot_num, color = plot_num)) + 
   geom_boxplot(alpha = 0.2, outlier.color = NA, position = position_dodge(0.8), aes(fill = plot_num)) + 
   geom_point(alpha = 0.7, sive = 1.2, position = 'jitter')+
-  ylab("Bulk Density (g/cm^3)") + 
+  ylab(expression(paste("Bulk Density ( g/",cm^{3}, ")"))) + 
   labs(color = "Plot") +
   xlab("Plot")+
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+

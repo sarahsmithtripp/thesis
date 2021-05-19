@@ -16,8 +16,8 @@ library(cowplot)
 
 
 #Set working directory to LAI files
-## Code NOT UPDATED TO RUN WITH METADATA 
-setwd("D:/Data/SmithTripp/Gavin_Lake/LAI_Data")
+
+setwd("D:/Data/SmithTripp/SmithTripp_Metadata")
 
 ## Necessary Variables 
 ## LAI Measurements for all Microclimate locations 
@@ -26,25 +26,27 @@ setwd("D:/Data/SmithTripp/Gavin_Lake/LAI_Data")
 
 
 # Work with LAI to compute plot level metrics (similiar to soil pl --------
-LAI <- readxl::read_excel("LAI_Plots.xlsx", sheet = "Cleaned")
+LAI_Cleanr <- read_excel("_Field-Collected-Data/Leaf_Area_Index_Licor_Data/LAI_clean.xlsx")
 
-LAI_PlotSummaries <- LAI %>% 
+LAI_PlotSummaries <- LAI_Cleanr %>% 
   group_by(Plot) %>% 
   summarise(mean_LAI = mean(LAI, na.rm =T),
-            sd_LAI = sd(LAI, na.rm = T))
+            sd_LAI = sd(LAI, na.rm = T)) %>% 
 
-LAI <- left_join(LAI, LAI_PlotSummaries, by = "Plot")
+
+LAI <- left_join(LAI_Cleanr, LAI_PlotSummaries, by = "Plot") 
+LAI$plot_num <- as.factor(LAI$plot_num)
 
 View(LAI)
 
 #Leaf Area Index Variability  
-LAI_plot <- ggplot(LAI, aes(group = Plot, color = Plot)) + 
-  geom_boxplot(aes(Plot, LAI), alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) + 
-  #geom_point(aes(Plot, mean_LAI), alpha = 0.8, position = 'jitter')+
-  ylab("LAI") + 
+LAI_plot <- ggplot(LAI, aes(group = plot_num, color = plot_num)) +
+  geom_boxplot(aes(plot_num, LAI), alpha = 0.2, outlier.color = NA, position = position_dodge(0.8)) +
+  geom_point(aes(plot_num, LAI), alpha = 0.8, position = 'jitter')+
+  ylab("LAI") + xlab("Plot") + 
   labs(color = "Plot") +
   theme(axis.text.x =  element_text(margin = margin(r= 0.4, l = 0.4)))+
-  cowplot:: theme_cowplot()
+  cowplot:: theme_cowplot() + ggthemes::scale_color_tableau(palette = "Classic Cyclic") 
 LAI_plot
 
 

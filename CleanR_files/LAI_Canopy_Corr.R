@@ -6,7 +6,8 @@ library(betareg)
 
 ##Load data 
 meta_data <- read_csv("_SoilTemp/CA_ST_MetaData_27-Nov-2020.csv")
-LAI_data_clean <- readxl::read_excel("_Field-Collected-Data/Leaf_Area_Index_Licor_Data/LAI_Plots_Clean.xlsx")
+LAI_data_clean <- readxl::read_excel("_Field-Collected-Data/Leaf_Area_Index_Licor_Data/LAI_Clean.xlsx") %>% 
+  mutate(Plotcode = paste0(plot_num, Point))
 
 ##Join_data 
 data <- LAI_data_clean%>% mutate(Plotcode = paste0("CA_ST_fs",Plotcode)) %>% left_join(meta_data) %>% 
