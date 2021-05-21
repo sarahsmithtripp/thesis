@@ -2,7 +2,7 @@
 ##OCt-18-2020
 #Code written to plot output from the field tree height surveys
 # Set working directory to where metadata is stored 
-#setwd("F:/SmithTripp_Metadata")
+setwd("D:/Data/SmithTripp/SmithTripp_Metadata/")
 
 #necessary packages to run 
 library(ggplot2)
@@ -135,14 +135,15 @@ map
 # read in field data locations 
 tree_locations_partial <- rgdal::readOGR("_Field-Collected-Data/Tree_Plots/tree_locations/tree_locations.shp")
 
-plot_12_coords <- cbind(585179.4209196416,5811225.1762742680)
-plot_12_data  <- data.frame(t(c(15, "tree_12",NA, NA, 2020-10-10,585164.4209196416, 5811240.1762742680)))
-names(plot_12_data) <- names(tree_locations_partial@data)
+#plot_12_coords <- cbind(585179.4209196416,5811225.1762742680)
+#plot_12_data  <- data.frame(t(c(15, "tree_12",NA, NA, 2020-10-10,585164.4209196416, 5811240.1762742680)))
+#names(plot_12_data) <- names(tree_locations_partial@data)
 #combine plot 12 with other plots 
 data_merge <- rbind(tree_locations_partial@data, plot_12_data)
 
 #create spatial polygons data frame to work with the data 
-tree_locations <- sp::SpatialPointsDataFrame(cbind(as.numeric(data_merge[,'x']),as.numeric(data_merge[,'y'])) ,data = data_merge)
+tree_locations <- tree_locations_partial
+#tree_locations <- sp::SpatialPointsDataFrame(cbind(as.numeric(data_merge[,'x']),as.numeric(data_merge[,'y'])) ,data = data_merge)
 
 #set shapefile locations 
 sp::proj4string(tree_locations)<- sp::CRS("+proj=utm +zone=10 +datum=NAD83 +units=m +no_defs")
@@ -164,14 +165,15 @@ raster::plot(tree_location_buffer)
 #finally there is a raster with a lower resolution (closer to what will be input in the microclimate models )
 # create list of file locations  ------------------------------------------
 query <- list.files(paste0("_RPA-Aqcuired-Data/Canopy_Structure/Canopy_Height/"), full.names = T)
-file_folders <- file_folders <- list(query[[1]], ## lowerplots
-                                     query[[2]], ## midplots
-                                     query[[3]], ##old_guy
-                                     query[[4]]) ## top plots
+file_folders <- file_folders <- list(query[[5]], ## lowerplots
+                                     query[[6]], ## midplots
+                                     query[[7]], ##old_guy
+                                     query[[8]]) ## top plots
 all_files <- unlist(lapply(file_folders, list.files, full.names = T))
 
 #raster with no values below 2m -> possibly more accurate to canopy height 
-chm_raster <- raster::raster(paste0(query[[3]])) ## all of the values included here 
+chm_raster <- raster::raster(paste0(query[[1]])) ## all of the values included here 
+chm_raster[chm_raster <= 2] <- NA
 
 #Alternative to aggregate to 2 meter resolution
 # chm_raster_2m <- raster::aggregate(chm_raster, 20, fun = mean, na.rm = T)
@@ -255,13 +257,14 @@ CHM_max_field <- merge(CHM_max_height, summary_trees, by = "Plot")
 levels(CHM_max_field$plot_num) 
 CHM_mean_field <- merge(CHM_mean_height, summary_trees, by = "Plot")
 levels(CHM_mean_field$plot_num)
+
 #check to see if DAP better at detecting live trees 
 CHM_field_mean_livetrees <- merge(CHM_mean_height, summary_livetrees, by = "Plot")
 CHM_field_2m <- merge(CHM_max_height_2m, summary_trees, by = "Plot")
 ## plot the derived data
 
 ## added values ot align field (which includes data taken at 1.6 m)
-max_plot <- ggplot(CHM_max_field@data, aes(x=chm_2m_10cmres+1.6, y = fieldhtmax_trees)) +
+max_plot <- ggplot(CHM_max_field@data, aes(x=oldguy_chm_10cm+1.6, y = fieldhtmax_trees)) +
   geom_point(size = 3) + 
   ylab("Maximum Measured Height (m)") +
   xlab("Maximum DAP Height (m)")+
@@ -276,20 +279,22 @@ max_plot <- ggplot(CHM_max_field@data, aes(x=chm_2m_10cmres+1.6, y = fieldhtmax_
   ggtitle("Max DAP vs. Field Ht (m)") 
 
 # remove outlier
-# chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(chm_2m_10cmres > 22 | chm_2m_10cmres < 5 ~ T,
-#                                                                       chm_2m_10cmres < 22 | chm_2m_10cmres > 5 ~ F))
-chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(chm_2m_10cmres > 22 ~ T, 
-                                                                        chm_2m_10cmres < 22 ~ F))
-lm_tree_height_mean_dirt <- lm((fieldhtmean_trees-1.6) ~ chm_2m_10cmres , chm_mean_field_clean)
-lm_tree_height_mean_clean <- lm((fieldhtmean_trees-1.6) ~ chm_2m_10cmres ,filter(
+chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(chm_10cm > 22 | chm_10cm < 5.1 ~ T,
+                                                                      chm_10cm < 22 | chm_10cm > 5 ~ F), 
+                               fieldht_use = fieldhtmean_trees - 1.6)
+# chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(oldguy_chm_10cm > 22 ~ T, 
+#                                                                         oldguy_chm_10cm < 22 ~ F), 
+#                                fieldht_use = fieldhtmean_trees -1.6)
+lm_tree_height_mean_dirt <- lm(fieldht_use ~ chm_10cm ,data = chm_mean_field_clean)
+lm_tree_height_mean_clean <- lm(fieldht_use ~ chm_10cm ,filter(
   chm_mean_field_clean, outlier == F))
-chm_mean_field_clean$pred_dirt_mod <- predict(lm_tree_height_mean_dirt) 
-mean_plot <- ggplot(chm_mean_field_clean, aes(x=chm_2m_10cmres, y = fieldhtmean_trees-1.6)) +
-  geom_point(aes(shape = outlier), size = 3) +
-  geom_line(aes(chm_2m_10cmres, pred_dirt_mod), linetype = "dotted", size = 1) +
-  stat_smooth(data = filter(chm_mean_field_clean, outlier == F),method = "lm") +
+chm_mean_field_clean$pred_dirt_mod <- c(predict(lm_tree_height_mean_dirt)) 
+mean_plot <- ggplot(chm_mean_field_clean) +
+  geom_point(aes(x = chm_10cm, y = fieldht_use, shape = outlier), size = 3) +
+  geom_line(aes(x = chm_10cm, y = pred_dirt_mod), linetype = "dotted", size = 1) +
+  stat_smooth(aes(x = chm_10cm, y = fieldht_use), data = filter(chm_mean_field_clean, outlier == F),method = "lm") +
   scale_linetype_manual(values=c("dotted", NA))+ 
-  labs(shape = "") +
+  labs(shape = "Outlier") +
   ylab("Mean measured height (m)") +
   xlab("Mean DAP Height (m)")+
   xlim(0,35) + 
