@@ -279,8 +279,8 @@ max_plot <- ggplot(CHM_max_field@data, aes(x=oldguy_chm_10cm+1.6, y = fieldhtmax
   ggtitle("Max DAP vs. Field Ht (m)") 
 
 # remove outlier
-chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(chm_10cm > 22 | chm_10cm < 5.1 ~ T,
-                                                                      chm_10cm < 22 | chm_10cm > 5 ~ F), 
+chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(chm_10cm > 22 | chm_10cm < 5.131 ~ T,
+                                                                      chm_10cm < 22 | chm_10cm > 5.131 ~ F), 
                                fieldht_use = fieldhtmean_trees - 1.6)
 # chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(oldguy_chm_10cm > 22 ~ T, 
 #                                                                         oldguy_chm_10cm < 22 ~ F), 
