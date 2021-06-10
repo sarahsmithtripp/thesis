@@ -164,15 +164,17 @@ raster::plot(tree_location_buffer)
 # the next uses a raster that goes to 0 
 #finally there is a raster with a lower resolution (closer to what will be input in the microclimate models )
 # create list of file locations  ------------------------------------------
-query <- list.files(paste0("_RPA-Aqcuired-Data/Canopy_Structure/Canopy_Height/"), full.names = T)
-file_folders <- file_folders <- list(query[[5]], ## lowerplots
+query <- list.files(paste0("D:/Data/smithTripp/Gavin_Lake/3D_models"), full.names = T)
+chm_raster <- raster <- raster::raster(paste0(query[[4]], "/chm_2m_10cmres.tif"))
+#query <- list.files(paste0("_RPA-Aqcuired-Data/Canopy_Structure/Canopy_Height/"), full.names = T)
+#file_folders <- file_folders <- list(query[[5]], ## lowerplots
                                      query[[6]], ## midplots
                                      query[[7]], ##old_guy
                                      query[[8]]) ## top plots
-all_files <- unlist(lapply(file_folders, list.files, full.names = T))
+#all_files <- unlist(lapply(file_folders, list.files, full.names = T))
 
 #raster with no values below 2m -> possibly more accurate to canopy height 
-chm_raster <- raster::raster(paste0(query[[1]])) ## all of the values included here 
+#chm_raster <- raster::raster(paste0(query[[1]])) ## all of the values included here 
 chm_raster[chm_raster <= 2] <- NA
 
 #Alternative to aggregate to 2 meter resolution
@@ -262,7 +264,7 @@ levels(CHM_mean_field$plot_num)
 CHM_field_mean_livetrees <- merge(CHM_mean_height, summary_livetrees, by = "Plot")
 CHM_field_2m <- merge(CHM_max_height_2m, summary_trees, by = "Plot")
 ## plot the derived data
-
+CHM_max_field@data$oldguy_chm_10cm <- CHM_max_field@data$chm_2m_10cmres
 ## added values ot align field (which includes data taken at 1.6 m)
 max_plot <- ggplot(CHM_max_field@data, aes(x=oldguy_chm_10cm+1.6, y = fieldhtmax_trees)) +
   geom_point(size = 3) + 
@@ -279,6 +281,7 @@ max_plot <- ggplot(CHM_max_field@data, aes(x=oldguy_chm_10cm+1.6, y = fieldhtmax
   ggtitle("Max DAP vs. Field Ht (m)") 
 
 # remove outlier
+CHM_mean_field@data$chm_10cm <- CHM_mean_field@data$chm_2m_10cmres
 chm_mean_field_clean <- mutate(CHM_mean_field@data, outlier = case_when(chm_10cm > 22 | chm_10cm < 5.131 ~ T,
                                                                       chm_10cm < 22 | chm_10cm > 5.131 ~ F), 
                                fieldht_use = fieldhtmean_trees - 1.6)
@@ -306,8 +309,8 @@ mean_plot <- ggplot(chm_mean_field_clean) +
   cowplot::theme_cowplot() + ggtitle(c("Mean DAP vs. Field Ht"))
 mean_plot
 
-# save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/HeightVerification_Plots.jpg',
-cowplot::plot_grid(max_plot, mean_plot, rel_widths = c(1.2, 1.5),base_width =7.5, base_height = 4)
+save_plot('D:/Data/SmithTripp/Gavin_Lake/Figures/HeightVerification_Plots_nooutliers.jpg',
+mean_plot,base_width =3.75, base_height = 4)
 
 
 lm_tree_height_max <- lm(fieldhtmax_trees ~ chm_2m_10cmres , CHM_max_field@data)
